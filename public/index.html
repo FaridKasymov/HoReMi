@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лобби Плеер Премиум</title>
+    <style>
+        /* Подключаем премиальный тонкий шрифт */
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400&display=swap');
+
+        body { 
+            margin: 0; 
+            color: white; 
+            font-family: 'Montserrat', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            overflow: hidden;
+            transition: background-image 2s ease-in-out;
+            background-size: cover;
+            background-position: center;
+            background-color: #111; 
+        }
+        
+        #bg-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6); 
+            z-index: -1;
+        }
+
+        #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; flex-direction: column;}
+        .hidden { display: none !important; }
+        
+        /* Виджеты: Часы и Погода */
+        #top-bar {
+            position: absolute;
+            top: 40px;
+            right: 50px;
+            display: flex;
+            gap: 30px;
+            font-size: 26px;
+            font-weight: 200;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* Анимация логотипа */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+
+        #hotel-logo { 
+            max-width: 300px; 
+            max-height: 200px; 
+            margin-bottom: 30px; 
+            display: none; 
+            animation: float 6s ease-in-out infinite; 
+        }
+        
+        /* Тонкий шрифт названия отеля */
+        #hotel-name { 
+            font-size: 56px; 
+            margin-bottom: 10px; 
+            font-weight: 200; 
+            letter-spacing: 10px; 
+            text-align: center; 
+            text-transform: uppercase;
+        }
+
+        /* Эстетичное отображение радио */
+        #radio-widget {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+            opacity: 0.7;
+        }
+        
+        /* Анимация минималистичного эквалайзера */
+        .equalizer {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 20px;
+        }
+        .eq-bar {
+            width: 2px;
+            background-color: white;
+            animation: eq 1s ease-in-out infinite alternate;
+        }
+        .eq-bar:nth-child(1) { height: 10px; animation-delay: 0.0s; }
+        .eq-bar:nth-child(2) { height: 20px; animation-delay: 0.2s; }
+        .eq-bar:nth-child(3) { height: 12px; animation-delay: 0.4s; }
+        .eq-bar:nth-child(4) { height: 16px; animation-delay: 0.1s; }
+
+        @keyframes eq {
+            0% { height: 4px; }
+            100% { height: 20px; }
+        }
+
+        #station-name { 
+            font-size: 20px; 
+            font-weight: 300; 
+            letter-spacing: 4px; 
+            text-transform: uppercase;
+        }
+        
+        .pulse { animation: pulse-animation 2s infinite; font-weight: 200; letter-spacing: 2px;}
+        @keyframes pulse-animation {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="bg-overlay"></div>
+    
+    <!-- Экран блокировки автовоспроизведения -->
+    <div id="overlay">
+        <h1 class="pulse">НАЖМИТЕ ОК НА ПУЛЬТЕ</h1>
+    </div>
+
+    <!-- Верхний бар -->
+    <div id="top-bar">
+        <div id="weather-widget">--°C</div>
+        <div id="clock-widget">--:--</div>
+    </div>
+    
+    <img id="hotel-logo" alt="Логотип отеля">
+    <div id="hotel-name">ЗАГРУЗКА...</div>
+    
+    <!-- Виджет радио с эквалайзером -->
+    <div id="radio-widget">
+        <div class="equalizer">
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+            <div class="eq-bar"></div>
+        </div>
+        <div id="station-name">ПОДКЛЮЧЕНИЕ...</div>
+    </div>
+    
+    <audio id="player"></audio>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const hotelSlug = urlParams.get('hotel') || 'plaza'; 
+        
+        const player = document.getElementById('player');
+        const overlay = document.getElementById('overlay');
+        const hotelNameTitle = document.getElementById('hotel-name');
+        const stationNameTitle = document.getElementById('station-name');
+        const hotelLogo = document.getElementById('hotel-logo');
+        
+        let currentStationUrl = "";
+        
+        // --- НАСТРОЙКА ФОТО ---
+        // Добавляй или удаляй названия файлов здесь:
+        const bgImages = ['1.jpg', '2.jpg', '3.jpg'];
+        let currentBgIndex = 0;
+        let isSlideshowRunning = false;
+
+        // --- ЧАСЫ И ПОГОДА ---
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('clock-widget').innerText = `${hours}:${minutes}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        async function fetchWeather() {
+            try {
+                const response = await fetch('/api/weather/v1/forecast');
+                const result = await response.json();
+                if (result.status === 'ok') {
+                    const temp = Math.round(result.data.current_weather.temperature);
+                    const code = result.data.current_weather.weathercode;
+                    
+                    let emoji = "☀️";
+                    if (code >= 1 && code <= 3) emoji = "⛅";
+                    else if (code >= 45 && code <= 48) emoji = "🌫️";
+                    else if (code >= 51 && code <= 67) emoji = "🌧️";
+                    else if (code >= 71 && code <= 77) emoji = "❄️";
+                    else if (code >= 95) emoji = "⛈️";
+                    
+                    const sign = temp > 0 ? '+' : '';
+                    document.getElementById('weather-widget').innerText = `${sign}${temp}°C ${emoji}`;
+                }
+            } catch (e) {
+                console.error("Ошибка API погоды", e);
+            }
+        }
+        
+        // --- ИНИЦИАЛИЗАЦИЯ ---
+        overlay.addEventListener('click', () => {
+            overlay.classList.add('hidden');
+            player.play().catch(e => console.log("Ожидание трека...")); 
+            
+            fetchData(); 
+            setInterval(fetchData, 5000); 
+            
+            // Запрашиваем погоду сразу и затем каждые 30 минут (1800000 мс)
+            fetchWeather();
+            setInterval(fetchWeather, 1800000); 
+        });
+
+        async function fetchData() {
+            try {
+                const response = await fetch(`/api/display?hotel=${hotelSlug}`);
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    hotelNameTitle.innerText = data.hotel.name;
+                    stationNameTitle.innerText = data.station.title; 
+
+                    const assetsPath = data.hotel.assets_path;
+                    
+                    hotelLogo.src = `/public/${assetsPath}/logo.png`;
+                    hotelLogo.style.display = "block"; 
+
+                    if (!isSlideshowRunning) {
+                        isSlideshowRunning = true;
+                        document.body.style.backgroundImage = `url('/public/${assetsPath}/${bgImages[0]}')`;
+                        
+                        setInterval(() => {
+                            currentBgIndex = (currentBgIndex + 1) % bgImages.length;
+                            const nextImageUrl = `/public/${assetsPath}/${bgImages[currentBgIndex]}`;
+                            
+                            const img = new Image();
+                            img.src = nextImageUrl;
+                            img.onload = () => {
+                                document.body.style.backgroundImage = `url('${nextImageUrl}')`;
+                            };
+                        }, 10000); 
+                    }
+
+                    if (data.station.url !== currentStationUrl && data.station.url !== "") {
+                        currentStationUrl = data.station.url;
+                        player.src = currentStationUrl;
+                        player.play();
+                    }
+                } else {
+                    stationNameTitle.innerText = data.message || "Ошибка API";
+                }
+            } catch (error) {
+                console.error("Ошибка связи с сервером", error);
+            }
+        }
+    </script>
+</body>
+</html>
