@@ -1,53 +1,58 @@
 import asyncio
-from db.database import AsyncSessionLocal
-from db.models import Hotel, User, Station, HotelState
+from sqlalchemy.future import select
+
+# Убедись, что импорты совпадают с твоей структурой проекта
+from db.database import engine, AsyncSessionLocal, Base
+from db.models import Hotel, Station, HotelState
 
 async def seed_data():
+    print("Начинаем подготовку базы...")
+    
+    # 1. Сначала генерируем структуру таблиц
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ Таблицы успешно созданы (или уже существуют).")
+
+    # 2. Заполняем данными
     async with AsyncSessionLocal() as session:
-        print("Начинаем заполнение базы...")
+        # Проверяем, есть ли уже отель Plaza, чтобы избежать ошибки дубликатов
+        result = await session.execute(select(Hotel).where(Hotel.slug == "plaza"))
+        existing_hotel = result.scalar_one_or_none()
 
-        # 1. Создаем тестовый отель
-        plaza_hotel = Hotel(
-            name="Plaza Hotel",
-            slug="plaza",
-            assets_path="hotels/plaza"
-        )
-        session.add(plaza_hotel)
-        await session.commit() 
-        await session.refresh(plaza_hotel) # Обновляем, чтобы получить сгенерированный ID
+        if existing_hotel:
+            print("⚠️ База уже заполнена! Повторное добавление отменено.")
+            return
 
-        # 2. Добавляем пару радиостанций
-        station1 = Station(
-            title="🎷 Уютный Джаз",
-            stream_url="https://listen10.myradio24.com/atmo" # Можешь заменить на свои ссылки
+        print("Записываем стартовые данные...")
+        
+        # Создаем отель
+        plaza = Hotel(
+            name="Plaza Hotel", 
+            slug="plaza", 
+            assets_path="hotels/plaza", 
+            is_active=True
         )
-        station2 = Station(
-            title="🍹 Лаунж",
-            stream_url="https://listen4.myradio24.com/lo-fi"
-        )
+        session.add(plaza)
+        await session.commit()
+        await session.refresh(plaza) # Обновляем, чтобы получить его ID из базы
+
+        # Создаем радиостанции (можешь поменять ссылки на реальные аудиопотоки)
+        station1 = Station(title="🍸 Лаунж", stream_url="https://lounge-stream.example.com")
+        station2 = Station(title="🎷 Джаз", stream_url="https://jazz-stream.example.com")
+        
         session.add_all([station1, station2])
         await session.commit()
         await session.refresh(station1)
 
-        # 3. Добавляем пользователя (тебя)
-        # ВНИМАНИЕ: Замени 123456789 на свой реальный Telegram ID!
-        admin_user = User(
-            telegram_id=276055271, 
-            full_name="Главный Админ",
-            hotel_id=plaza_hotel.id,
-            role="admin"
-        )
-        session.add(admin_user)
-
-        # 4. Устанавливаем начальное состояние телевизора для Плазы
-        initial_state = HotelState(
-            hotel_id=plaza_hotel.id,
+        # Создаем состояние отеля по умолчанию (включаем Лаунж)
+        plaza_state = HotelState(
+            hotel_id=plaza.id,
             current_station_id=station1.id
         )
-        session.add(initial_state)
-
+        session.add(plaza_state)
         await session.commit()
-        print("✅ База данных успешно заполнена тестовыми данными!")
+
+        print("✅ База успешно заполнена стартовыми отелями и станциями!")
 
 if __name__ == "__main__":
     asyncio.run(seed_data())
