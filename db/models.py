@@ -14,6 +14,7 @@ class Hotel(Base):
     slug: Mapped[str] = mapped_column(String(50), unique=True) # Уникальный хвост ссылки, например 'hilton'
     assets_path: Mapped[str] = mapped_column(String(200))      # Путь к папке с логотипами/фото
     is_active: Mapped[bool] = mapped_column(default=True)      # Активна ли подписка отеля
+    address: Mapped[str] = mapped_column(String(200), default="")
 
 class User(Base):
     __tablename__ = 'users'

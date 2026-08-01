@@ -53,7 +53,8 @@ async def get_display_data(hotel: str, db: AsyncSession = Depends(get_db)):
         "hotel": {
             "name": hotel_obj.name,
             # Телевизор поймет, что картинки надо искать по этому пути
-            "assets_path": hotel_obj.assets_path 
+            "assets_path": hotel_obj.assets_path,
+            "address": hotel_obj.address
         },
         "station": {
             "title": station_title,

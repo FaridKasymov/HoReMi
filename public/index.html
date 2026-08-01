@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Лобби Плеер Премиум</title>
+    <title>Лобби Плеер / Lobby Player</title>
     <style>
-        /* Подключаем премиальный тонкий шрифт */
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400&display=swap');
 
         body { 
@@ -27,24 +26,45 @@
         #bg-overlay {
             position: absolute;
             inset: 0;
-            background: rgba(0, 0, 0, 0.6); 
+            background: rgba(0, 0, 0, 0.5); 
             z-index: -1;
         }
 
         #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; flex-direction: column;}
         .hidden { display: none !important; }
         
-        /* Виджеты: Часы и Погода */
+        /* Верхний бар (погода и часы) */
         #top-bar {
             position: absolute;
             top: 40px;
             right: 50px;
             display: flex;
-            gap: 30px;
-            font-size: 26px;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .widget-pill {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 22px;
             font-weight: 200;
             letter-spacing: 2px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Адрес в правом нижнем углу */
+        #hotel-address {
+            position: absolute;
+            bottom: 40px;
+            right: 50px;
+            font-size: 18px;
         }
 
         /* Анимация логотипа */
@@ -62,7 +82,6 @@
             animation: float 6s ease-in-out infinite; 
         }
         
-        /* Тонкий шрифт названия отеля */
         #hotel-name { 
             font-size: 56px; 
             margin-bottom: 10px; 
@@ -72,12 +91,14 @@
             text-transform: uppercase;
         }
 
-        /* Эстетичное отображение радио */
+        /* Плеер в левом нижнем углу */
         #radio-widget {
+            position: absolute;
+            bottom: 40px;
+            left: 50px;
             display: flex;
             align-items: center;
             gap: 15px;
-            margin-top: 15px;
             opacity: 0.7;
         }
         
@@ -121,21 +142,20 @@
 <body>
     <div id="bg-overlay"></div>
     
-    <!-- Экран блокировки автовоспроизведения -->
     <div id="overlay">
-        <h1 class="pulse">НАЖМИТЕ ОК НА ПУЛЬТЕ</h1>
+        <h1 class="pulse">PRESS OK</h1>
     </div>
 
-    <!-- Верхний бар -->
+    <!-- Верхний бар (погода и часы) -->
     <div id="top-bar">
-        <div id="weather-widget">--°C</div>
-        <div id="clock-widget">--:--</div>
+        <div class="widget-pill" id="weather-widget">--°C</div>
+        <div class="widget-pill" id="clock-widget">--:--</div>
     </div>
     
     <img id="hotel-logo" alt="Логотип отеля">
-    <div id="hotel-name">ЗАГРУЗКА...</div>
+    <div id="hotel-name"></div>
     
-    <!-- Виджет радио с эквалайзером -->
+    <!-- Радио плеер в левом нижнем углу -->
     <div id="radio-widget">
         <div class="equalizer">
             <div class="eq-bar"></div>
@@ -145,6 +165,9 @@
         </div>
         <div id="station-name">ПОДКЛЮЧЕНИЕ...</div>
     </div>
+
+    <!-- Адрес в правом нижнем углу -->
+    <div class="widget-pill" id="hotel-address">--</div>
     
     <audio id="player"></audio>
 
@@ -157,16 +180,14 @@
         const hotelNameTitle = document.getElementById('hotel-name');
         const stationNameTitle = document.getElementById('station-name');
         const hotelLogo = document.getElementById('hotel-logo');
+        const hotelAddressEl = document.getElementById('hotel-address');
         
         let currentStationUrl = "";
         
-        // --- НАСТРОЙКА ФОТО ---
-        // Добавляй или удаляй названия файлов здесь:
         const bgImages = ['1.jpg', '2.jpg', '3.jpg'];
         let currentBgIndex = 0;
         let isSlideshowRunning = false;
 
-        // --- ЧАСЫ И ПОГОДА ---
         function updateClock() {
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
@@ -176,6 +197,31 @@
         setInterval(updateClock, 1000);
         updateClock();
 
+        function getWeatherDescription(code) {
+            const weatherMap = {
+                0: "Clear / Ясно",
+                1: "Mainly clear / Малооблачно",
+                2: "Partly cloudy / Переменная облачность",
+                3: "Overcast / Пасмурно",
+                45: "Fog / Туман",
+                48: "Rime fog / Туман с изморозью",
+                51: "Light drizzle / Морось",
+                53: "Drizzle / Морось",
+                55: "Dense drizzle / Плотная морось",
+                61: "Slight rain / Небольшой дождь",
+                63: "Rain / Дождь",
+                65: "Heavy rain / Сильный дождь",
+                71: "Slight snow / Небольшой снег",
+                73: "Snow / Снег",
+                75: "Heavy snow / Сильный снег",
+                80: "Rainfall / Дождь",
+                85: "Snowfall / Снегопад",
+                95: "Thunderstorm / Гроза",
+                99: "Hail / Град"
+            };
+            return weatherMap[code] || "Cloudy / Облачно";
+        }
+
         async function fetchWeather() {
             try {
                 const response = await fetch('/api/weather/v1/forecast');
@@ -184,22 +230,16 @@
                     const temp = Math.round(result.data.current_weather.temperature);
                     const code = result.data.current_weather.weathercode;
                     
-                    let emoji = "☀️";
-                    if (code >= 1 && code <= 3) emoji = "⛅";
-                    else if (code >= 45 && code <= 48) emoji = "🌫️";
-                    else if (code >= 51 && code <= 67) emoji = "🌧️";
-                    else if (code >= 71 && code <= 77) emoji = "❄️";
-                    else if (code >= 95) emoji = "⛈️";
-                    
+                    const conditionText = getWeatherDescription(code);
                     const sign = temp > 0 ? '+' : '';
-                    document.getElementById('weather-widget').innerText = `${sign}${temp}°C ${emoji}`;
+                    
+                    document.getElementById('weather-widget').innerText = `${sign}${temp}°C  •  ${conditionText}`;
                 }
             } catch (e) {
                 console.error("Ошибка API погоды", e);
             }
         }
         
-        // --- ИНИЦИАЛИЗАЦИЯ ---
         overlay.addEventListener('click', () => {
             overlay.classList.add('hidden');
             player.play().catch(e => console.log("Ожидание трека...")); 
@@ -207,7 +247,6 @@
             fetchData(); 
             setInterval(fetchData, 5000); 
             
-            // Запрашиваем погоду сразу и затем каждые 30 минут (1800000 мс)
             fetchWeather();
             setInterval(fetchWeather, 1800000); 
         });
@@ -220,6 +259,7 @@
                 if (data.status === 'ok') {
                     hotelNameTitle.innerText = data.hotel.name;
                     stationNameTitle.innerText = data.station.title; 
+                    hotelAddressEl.innerText = data.hotel.address || "";
 
                     const assetsPath = data.hotel.assets_path;
                     

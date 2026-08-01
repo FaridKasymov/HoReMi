@@ -1,58 +1,78 @@
+import os
 import asyncio
-from sqlalchemy.future import select
+from dotenv import load_dotenv
+from sqlalchemy import select
+from db.database import AsyncSessionLocal, engine, Base
+from db.models import Hotel, Station, User, HotelState
 
-# Убедись, что импорты совпадают с твоей структурой проекта
-from db.database import engine, AsyncSessionLocal, Base
-from db.models import Hotel, Station, HotelState
+load_dotenv()
 
 async def seed_data():
-    print("Начинаем подготовку базы...")
+    print("Инициализация схемы базы данных...")
     
-    # 1. Сначала генерируем структуру таблиц
+    # 1. Асинхронное создание таблиц
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Таблицы успешно созданы (или уже существуют).")
 
-    # 2. Заполняем данными
-    async with AsyncSessionLocal() as session:
-        # Проверяем, есть ли уже отель Plaza, чтобы избежать ошибки дубликатов
-        result = await session.execute(select(Hotel).where(Hotel.slug == "plaza"))
-        existing_hotel = result.scalar_one_or_none()
+    # 2. Асинхронная сессия
+    async with AsyncSessionLocal() as db:
+        try:
+            admin_id_str = os.getenv("ADMIN_ID")
+            if not admin_id_str:
+                print("❌ Ошибка: ADMIN_ID не задан в .env!")
+                return
+            
+            admin_tg_id = int(admin_id_str)
 
-        if existing_hotel:
-            print("⚠️ База уже заполнена! Повторное добавление отменено.")
-            return
+            # Проверяем, пустая ли база
+            result = await db.execute(select(Hotel))
+            existing_hotel = result.scalars().first()
+            
+            if existing_hotel:
+                print("⚠️ База уже содержит данные. Пропускаем заполнение (seed).")
+                return
 
-        print("Записываем стартовые данные...")
-        
-        # Создаем отель
-        plaza = Hotel(
-            name="Plaza Hotel", 
-            slug="plaza", 
-            assets_path="hotels/plaza", 
-            is_active=True
-        )
-        session.add(plaza)
-        await session.commit()
-        await session.refresh(plaza) # Обновляем, чтобы получить его ID из базы
+            print("Создаем стартовые данные...")
 
-        # Создаем радиостанции (можешь поменять ссылки на реальные аудиопотоки)
-        station1 = Station(title="🍸 Лаунж", stream_url="https://lounge-stream.example.com")
-        station2 = Station(title="🎷 Джаз", stream_url="https://jazz-stream.example.com")
-        
-        session.add_all([station1, station2])
-        await session.commit()
-        await session.refresh(station1)
+            # 3. Создаем отель (включая адрес для правого нижнего угла)
+            plaza = Hotel(
+                name="Plaza Hotel", 
+                slug="plaza", 
+                assets_path="hotels/plaza",
+                address="ул. Ленина, 1 • 1 Lenin Street", # <--- Добавили адрес
+                is_active=True
+            )
+            db.add(plaza)
+            await db.flush()  # Получаем plaza.id
 
-        # Создаем состояние отеля по умолчанию (включаем Лаунж)
-        plaza_state = HotelState(
-            hotel_id=plaza.id,
-            current_station_id=station1.id
-        )
-        session.add(plaza_state)
-        await session.commit()
+            # 4. Создаем радиостанции
+            station1 = Station(title="Lounge", stream_url="https://listen4.myradio24.com/lo-fi")
+            station2 = Station(title="Lounge", stream_url="https://listen10.myradio24.com/atmo")
+            db.add_all([station1, station2])
+            await db.flush()  # Получаем их id
 
-        print("✅ База успешно заполнена стартовыми отелями и станциями!")
+            # 5. Привязываем Лаунж-станцию к нашему отелю по умолчанию
+            plaza_state = HotelState(
+                hotel_id=plaza.id, 
+                current_station_id=station1.id
+            )
+            db.add(plaza_state)
+
+            # 6. Создаем администратора и привязываем к отелю
+            admin = User(
+                telegram_id=admin_tg_id,
+                full_name="Администратор",
+                hotel_id=plaza.id, 
+                role="admin"
+            )
+            db.add(admin)
+
+            await db.commit()
+            print("✅ База успешно заполнена стартовыми отелями, станциями и админом!")
+
+        except Exception as e:
+            await db.rollback()
+            print(f"❌ Произошла ошибка при заполнении базы: {e}")
 
 if __name__ == "__main__":
     asyncio.run(seed_data())
