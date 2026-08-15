@@ -9,7 +9,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from sqlalchemy import select
 from db.database import AsyncSessionLocal
-from db.models import User, Station, HotelState, Hotel
+from db.models import User, Station, HotelState, Hotel, ScreenSession
 
 load_dotenv()
 
@@ -91,6 +91,38 @@ async def change_station(callback: types.CallbackQuery):
         await callback.answer(f"Включаю: {station.title}")
         # Сообщение в чат
         await callback.message.answer(f"✅ Музыка переключена на: <b>{station.title}</b>", parse_mode="HTML")
+
+# Ловим сообщения, состоящие ровно из 6 цифр
+@dp.message(F.text.regexp(r'^\d{6}$'))
+async def link_screen(message: types.Message):
+    code = message.text
+    
+    async with AsyncSessionLocal() as session:
+        # Проверяем права пользователя
+        user_res = await session.execute(select(User).where(User.telegram_id == message.from_user.id))
+        user = user_res.scalar_one_or_none()
+        
+        if not user:
+            await message.answer("⛔️ У вас нет прав для привязки экранов.")
+            return
+
+        # Ищем сессию с таким кодом
+        screen_res = await session.execute(select(ScreenSession).where(ScreenSession.pairing_code == code))
+        screen = screen_res.scalar_one_or_none()
+        
+        if not screen:
+            await message.answer("❌ Код не найден. Убедитесь, что экран включен, и попробуйте еще раз.")
+            return
+            
+        if screen.hotel_id:
+            await message.answer("⚠️ Этот экран уже привязан к отелю.")
+            return
+            
+        # Привязываем экран к отелю текущего администратора
+        screen.hotel_id = user.hotel_id
+        await session.commit()
+        
+        await message.answer("✅ Отлично! Экран успешно привязан. Музыка сейчас заиграет.")
 
 async def main():
     logging.basicConfig(level=logging.INFO)

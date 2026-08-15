@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HoReMi // Отель</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap');
+
+        body {
+            margin: 0; padding: 0; font-family: 'Montserrat', sans-serif;
+            background-color: #0f0f11; color: white;
+        }
+        .header {
+            padding: 30px 50px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .header h1 { margin: 0; font-weight: 300; }
+        .back-btn {
+            color: #888; text-decoration: none; font-size: 14px;
+            border: 1px solid #333; padding: 8px 16px; border-radius: 20px; transition: 0.3s;
+        }
+        .back-btn:hover { background: white; color: black; }
+
+        .container { padding: 40px 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+        
+        .panel { background: #1a1a1d; border-radius: 16px; padding: 30px; border: 1px solid rgba(255,255,255,0.05); }
+        .panel h2 { margin-top: 0; font-weight: 400; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; color: #888; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;}
+        .form-group select, .form-group input {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333;
+            background: #111; color: white; font-family: inherit; font-size: 16px;
+        }
+        
+        .btn {
+            background: white; color: black; border: none; padding: 12px 20px;
+            border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s;
+        }
+        .btn:hover { opacity: 0.8; }
+
+        .screen-item {
+            background: rgba(255,255,255,0.03); padding: 15px 20px; border-radius: 8px;
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+        }
+        .screen-info span { display: block; color: #aaa; font-size: 12px; margin-top: 5px;}
+        .btn-danger { background: transparent; border: 1px solid #F44336; color: #F44336; padding: 8px 12px; border-radius: 6px; cursor: pointer;}
+        .btn-danger:hover { background: #F44336; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <a href="/public/dashboard.html" class="back-btn">← Назад к списку</a>
+            <h1 id="hotel-title" style="margin-top: 15px;">Загрузка...</h1>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Настройки отеля -->
+        <div class="panel">
+            <h2>Настройки музыки</h2>
+            <div class="form-group">
+                <label>Текущая радиостанция</label>
+                <select id="station-select"></select>
+            </div>
+            <button class="btn" onclick="saveStation()">Сохранить изменения</button>
+        </div>
+
+        <!-- Управление ТВ экранами -->
+        <div class="panel">
+            <h2>Подключенные экраны (ТВ)</h2>
+            <div id="screens-list">
+                <!-- Сюда подгрузятся экраны -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const hotelId = urlParams.get('hotel_id');
+
+        async function loadHotelData() {
+            const res = await fetch(`/api/dashboard/hotel/${hotelId}`);
+            const data = await res.json();
+
+            if (data.status === 'ok') {
+                document.getElementById('hotel-title').innerText = data.hotel.name;
+                
+                // Заполняем станции
+                const select = document.getElementById('station-select');
+                select.innerHTML = '';
+                data.stations.forEach(st => {
+                    const option = document.createElement('option');
+                    option.value = st.id;
+                    option.innerText = st.title;
+                    if (st.id === data.current_station_id) option.selected = true;
+                    select.appendChild(option);
+                });
+
+                // Заполняем экраны
+                const list = document.getElementById('screens-list');
+                list.innerHTML = '';
+                if (data.screens.length === 0) {
+                    list.innerHTML = '<p style="color:#666;">Нет подключенных экранов</p>';
+                } else {
+                    data.screens.forEach(sc => {
+                        list.innerHTML += `
+                            <div class="screen-item">
+                                <div class="screen-info">
+                                    Код привязки: <b>${sc.pairing_code}</b>
+                                    <span>Добавлен: ${sc.created_at}</span>
+                                </div>
+                                <button class="btn-danger" onclick="unlinkScreen(${sc.id})">Отвязать</button>
+                            </div>
+                        `;
+                    });
+                }
+            }
+        }
+
+        async function saveStation() {
+            const stationId = document.getElementById('station-select').value;
+            await fetch(`/api/dashboard/hotel/${hotelId}/station/${stationId}`, { method: 'POST' });
+            alert('Радиостанция успешно обновлена!');
+        }
+
+        async function unlinkScreen(sessionId) {
+            if(confirm('Точно отвязать этот экран? Телевизор перестанет играть музыку.')) {
+                await fetch(`/api/screen/${sessionId}`, { method: 'DELETE' });
+                loadHotelData(); // Перезагружаем список
+            }
+        }
+
+        // Старт
+        if (hotelId) {
+            loadHotelData();
+        } else {
+            alert('Ошибка: ID отеля не указан');
+        }
+    </script>
+</body>
+</html>

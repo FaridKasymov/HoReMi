@@ -8,145 +8,70 @@
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400&display=swap');
 
         body { 
-            margin: 0; 
-            color: white; 
-            font-family: 'Montserrat', sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            overflow: hidden;
+            margin: 0; color: white; font-family: 'Montserrat', sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; height: 100vh; overflow: hidden;
             transition: background-image 2s ease-in-out;
-            background-size: cover;
-            background-position: center;
+            background-size: cover; background-position: center;
             background-color: #111; 
         }
         
-        #bg-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5); 
-            z-index: -1;
-        }
-
+        #bg-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: -1; }
         #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; flex-direction: column;}
         .hidden { display: none !important; }
         
-        /* Верхний бар (погода и часы) */
-        #top-bar {
-            position: absolute;
-            top: 40px;
-            right: 50px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
+        /* Экран сопряжения */
+        #pairing-screen {
+            position: absolute; inset: 0; background: #111; z-index: 20; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        #pairing-screen h2 { font-weight: 300; letter-spacing: 5px; margin-bottom: 20px; }
+        #pairing-screen p { font-weight: 200; font-size: 20px; margin-bottom: 40px; color: #aaa; }
+        #pairing-code { 
+            font-size: 80px; font-weight: 400; letter-spacing: 15px; 
+            border: 2px dashed rgba(255,255,255,0.2); padding: 20px 40px; border-radius: 20px;
         }
 
+        #top-bar { position: absolute; top: 40px; right: 50px; display: flex; align-items: center; gap: 20px; }
         .widget-pill {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 12px 24px;
-            border-radius: 40px;
-            font-size: 22px;
-            font-weight: 200;
-            letter-spacing: 2px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1); padding: 12px 24px; border-radius: 40px;
+            font-size: 22px; font-weight: 200; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex; align-items: center; gap: 12px;
         }
-
-        /* Адрес в правом нижнем углу */
-        #hotel-address {
-            position: absolute;
-            bottom: 40px;
-            right: 50px;
-            font-size: 18px;
-        }
-
-        /* Анимация логотипа */
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-15px); }
-            100% { transform: translateY(0px); }
-        }
-
-        #hotel-logo { 
-            max-width: 300px; 
-            max-height: 200px; 
-            margin-bottom: 30px; 
-            display: none; 
-            animation: float 6s ease-in-out infinite; 
-        }
+        #hotel-address { position: absolute; bottom: 40px; right: 50px; font-size: 18px; }
         
-        #hotel-name { 
-            font-size: 56px; 
-            margin-bottom: 10px; 
-            font-weight: 200; 
-            letter-spacing: 10px; 
-            text-align: center; 
-            text-transform: uppercase;
-        }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
+        #hotel-logo { max-width: 300px; max-height: 200px; margin-bottom: 30px; display: none; animation: float 6s ease-in-out infinite; }
+        #hotel-name { font-size: 56px; margin-bottom: 10px; font-weight: 200; letter-spacing: 10px; text-align: center; text-transform: uppercase; }
 
-        /* Плеер в левом нижнем углу */
-        #radio-widget {
-            position: absolute;
-            bottom: 40px;
-            left: 50px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            opacity: 0.7;
-        }
-        
-        /* Анимация минималистичного эквалайзера */
-        .equalizer {
-            display: flex;
-            align-items: flex-end;
-            gap: 4px;
-            height: 20px;
-        }
-        .eq-bar {
-            width: 2px;
-            background-color: white;
-            animation: eq 1s ease-in-out infinite alternate;
-        }
+        #radio-widget { position: absolute; bottom: 40px; left: 50px; display: flex; align-items: center; gap: 15px; opacity: 0.7; }
+        .equalizer { display: flex; align-items: flex-end; gap: 4px; height: 20px; }
+        .eq-bar { width: 2px; background-color: white; animation: eq 1s ease-in-out infinite alternate; }
         .eq-bar:nth-child(1) { height: 10px; animation-delay: 0.0s; }
         .eq-bar:nth-child(2) { height: 20px; animation-delay: 0.2s; }
         .eq-bar:nth-child(3) { height: 12px; animation-delay: 0.4s; }
         .eq-bar:nth-child(4) { height: 16px; animation-delay: 0.1s; }
+        @keyframes eq { 0% { height: 4px; } 100% { height: 20px; } }
 
-        @keyframes eq {
-            0% { height: 4px; }
-            100% { height: 20px; }
-        }
-
-        #station-name { 
-            font-size: 20px; 
-            font-weight: 300; 
-            letter-spacing: 4px; 
-            text-transform: uppercase;
-        }
-        
+        #station-name { font-size: 20px; font-weight: 300; letter-spacing: 4px; text-transform: uppercase; }
         .pulse { animation: pulse-animation 2s infinite; font-weight: 200; letter-spacing: 2px;}
-        @keyframes pulse-animation {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
-        }
+        @keyframes pulse-animation { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
+    <!-- Экран сопряжения (Smart TV стиль) -->
+    <div id="pairing-screen" class="hidden">
+        <h2>ПРИВЯЗКА ЭКРАНА</h2>
+        <p>Отправьте этот код боту для активации</p>
+        <div id="pairing-code">------</div>
+    </div>
+
     <div id="bg-overlay"></div>
-    
-    <div id="overlay">
+    <div id="overlay" class="hidden">
         <h1 class="pulse">PRESS OK</h1>
     </div>
 
-    <!-- Верхний бар (погода и часы) -->
     <div id="top-bar">
         <div class="widget-pill" id="weather-widget">--°C</div>
         <div class="widget-pill" id="clock-widget">--:--</div>
@@ -155,114 +80,102 @@
     <img id="hotel-logo" alt="Логотип отеля">
     <div id="hotel-name"></div>
     
-    <!-- Радио плеер в левом нижнем углу -->
     <div id="radio-widget">
         <div class="equalizer">
-            <div class="eq-bar"></div>
-            <div class="eq-bar"></div>
-            <div class="eq-bar"></div>
-            <div class="eq-bar"></div>
+            <div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>
         </div>
         <div id="station-name">ПОДКЛЮЧЕНИЕ...</div>
     </div>
-
-    <!-- Адрес в правом нижнем углу -->
     <div class="widget-pill" id="hotel-address">--</div>
     
     <audio id="player"></audio>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const hotelSlug = urlParams.get('hotel') || 'plaza'; 
-        
         const player = document.getElementById('player');
         const overlay = document.getElementById('overlay');
-        const hotelNameTitle = document.getElementById('hotel-name');
-        const stationNameTitle = document.getElementById('station-name');
-        const hotelLogo = document.getElementById('hotel-logo');
-        const hotelAddressEl = document.getElementById('hotel-address');
+        const pairingScreen = document.getElementById('pairing-screen');
+        const pairingCodeEl = document.getElementById('pairing-code');
         
         let currentStationUrl = "";
-        
         const bgImages = ['1.jpg', '2.jpg', '3.jpg'];
         let currentBgIndex = 0;
         let isSlideshowRunning = false;
 
-        function updateClock() {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            document.getElementById('clock-widget').innerText = `${hours}:${minutes}`;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+        // --- ЛОГИКА АВТОРИЗАЦИИ ---
+        async function checkAuth() {
+            // PREVIEW РЕЖИМ
+            const urlParams = new URLSearchParams(window.location.search);
+            const previewSlug = urlParams.get('preview');
+            
+            if (previewSlug) {
+                localStorage.setItem('hotel_slug', previewSlug); // Сохраняем отель
+                pairingScreen.classList.add('hidden');           // Скрываем код
+                overlay.classList.remove('hidden');              // PRESS OK
+                return; // Выходим из функции, авторизация через бота не нужна
+            }
+            
+            let token = localStorage.getItem('auth_token');
+            let hotelSlug = localStorage.getItem('hotel_slug');
 
-        function getWeatherDescription(code) {
-            const weatherMap = {
-                0: "Clear / Ясно",
-                1: "Mainly clear / Малооблачно",
-                2: "Partly cloudy / Переменная облачность",
-                3: "Overcast / Пасмурно",
-                45: "Fog / Туман",
-                48: "Rime fog / Туман с изморозью",
-                51: "Light drizzle / Морось",
-                53: "Drizzle / Морось",
-                55: "Dense drizzle / Плотная морось",
-                61: "Slight rain / Небольшой дождь",
-                63: "Rain / Дождь",
-                65: "Heavy rain / Сильный дождь",
-                71: "Slight snow / Небольшой снег",
-                73: "Snow / Снег",
-                75: "Heavy snow / Сильный снег",
-                80: "Rainfall / Дождь",
-                85: "Snowfall / Снегопад",
-                95: "Thunderstorm / Гроза",
-                99: "Hail / Град"
-            };
-            return weatherMap[code] || "Cloudy / Облачно";
-        }
-
-        async function fetchWeather() {
-            try {
-                const response = await fetch('/api/weather/v1/forecast');
-                const result = await response.json();
-                if (result.status === 'ok') {
-                    const temp = Math.round(result.data.current_weather.temperature);
-                    const code = result.data.current_weather.weathercode;
-                    
-                    const conditionText = getWeatherDescription(code);
-                    const sign = temp > 0 ? '+' : '';
-                    
-                    document.getElementById('weather-widget').innerText = `${sign}${temp}°C  •  ${conditionText}`;
+            if (!token || !hotelSlug) {
+                pairingScreen.classList.remove('hidden');
+                
+                // Запрашиваем код, если токена нет
+                if (!token) {
+                    const res = await fetch('/api/screen/init', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.status === 'ok') {
+                        token = data.auth_token;
+                        localStorage.setItem('auth_token', token);
+                        pairingCodeEl.innerText = data.pairing_code;
+                    }
                 }
-            } catch (e) {
-                console.error("Ошибка API погоды", e);
+
+                // Пингуем сервер, ждем пока админ введет код в бота
+                const checkInterval = setInterval(async () => {
+                    if(!token) return;
+                    const res = await fetch(`/api/screen/status?token=${token}`);
+                    const data = await res.json();
+                    
+                    if (data.status === 'paired') {
+                        clearInterval(checkInterval);
+                        localStorage.setItem('hotel_slug', data.hotel_slug);
+                        pairingScreen.classList.add('hidden');
+                        overlay.classList.remove('hidden'); // Показываем PRESS OK
+                    }
+                }, 3000);
+            } else {
+                // Если уже авторизованы
+                overlay.classList.remove('hidden');
             }
         }
-        
+
+        // Запуск экрана после нажатия PRESS OK
         overlay.addEventListener('click', () => {
             overlay.classList.add('hidden');
-            player.play().catch(e => console.log("Ожидание трека...")); 
+            player.play().catch(() => console.log("Ожидание трека...")); 
             
             fetchData(); 
             setInterval(fetchData, 5000); 
-            
             fetchWeather();
             setInterval(fetchWeather, 1800000); 
         });
 
         async function fetchData() {
+            const hotelSlug = localStorage.getItem('hotel_slug');
+            if (!hotelSlug) return;
+
             try {
                 const response = await fetch(`/api/display?hotel=${hotelSlug}`);
                 const data = await response.json();
 
                 if (data.status === 'ok') {
-                    hotelNameTitle.innerText = data.hotel.name;
-                    stationNameTitle.innerText = data.station.title; 
-                    hotelAddressEl.innerText = data.hotel.address || "";
+                    document.getElementById('hotel-name').innerText = data.hotel.name;
+                    document.getElementById('station-name').innerText = data.station.title; 
+                    document.getElementById('hotel-address').innerText = data.hotel.address || "";
 
                     const assetsPath = data.hotel.assets_path;
-                    
+                    const hotelLogo = document.getElementById('hotel-logo');
                     hotelLogo.src = `/public/${assetsPath}/logo.png`;
                     hotelLogo.style.display = "block"; 
 
@@ -273,12 +186,9 @@
                         setInterval(() => {
                             currentBgIndex = (currentBgIndex + 1) % bgImages.length;
                             const nextImageUrl = `/public/${assetsPath}/${bgImages[currentBgIndex]}`;
-                            
                             const img = new Image();
                             img.src = nextImageUrl;
-                            img.onload = () => {
-                                document.body.style.backgroundImage = `url('${nextImageUrl}')`;
-                            };
+                            img.onload = () => { document.body.style.backgroundImage = `url('${nextImageUrl}')`; };
                         }, 10000); 
                     }
 
@@ -287,13 +197,31 @@
                         player.src = currentStationUrl;
                         player.play();
                     }
-                } else {
-                    stationNameTitle.innerText = data.message || "Ошибка API";
                 }
-            } catch (error) {
-                console.error("Ошибка связи с сервером", error);
-            }
+            } catch (error) { console.error("Ошибка связи с сервером", error); }
         }
+
+        // Часы и погода
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock-widget').innerText = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        async function fetchWeather() {
+            try {
+                const response = await fetch('/api/weather/v1/forecast');
+                const result = await response.json();
+                if (result.status === 'ok') {
+                    const temp = Math.round(result.data.current_weather.temperature);
+                    const sign = temp > 0 ? '+' : '';
+                    document.getElementById('weather-widget').innerText = `${sign}${temp}°C`;
+                }
+            } catch (e) {}
+        }
+
+        // Старт логики
+        checkAuth();
     </script>
 </body>
 </html>

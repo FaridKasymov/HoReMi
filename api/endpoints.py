@@ -1,10 +1,14 @@
 import httpx
+import uuid
+import random
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy import func
+from db.models import CustomBlock
 
 from db.database import AsyncSessionLocal
-from db.models import Hotel, HotelState, Station
+from db.models import Hotel, HotelState, Station, ScreenSession
 
 router = APIRouter()
 
@@ -78,3 +82,122 @@ async def get_weather(lat: float = 55.75, lon: float = 37.61):
             return {"status": "error", "message": "Ошибка API погоды"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+@router.post("/api/screen/init")
+async def init_screen(db: AsyncSession = Depends(get_db)):
+    """Выдает экрану уникальный токен и 6-значный код сопряжения"""
+    # Генерируем 6 случайных цифр
+    pairing_code = str(random.randint(100000, 999999))
+    auth_token = str(uuid.uuid4())
+    
+    new_session = ScreenSession(
+        pairing_code=pairing_code,
+        auth_token=auth_token
+    )
+    db.add(new_session)
+    await db.commit()
+    
+    return {"status": "ok", "pairing_code": pairing_code, "auth_token": auth_token}
+
+@router.get("/api/screen/status")
+async def get_screen_status(token: str, db: AsyncSession = Depends(get_db)):
+    """Позволяет экрану узнать, привязал ли его админ к отелю"""
+    result = await db.execute(select(ScreenSession).where(ScreenSession.auth_token == token))
+    session_obj = result.scalar_one_or_none()
+    
+    if not session_obj:
+        raise HTTPException(status_code=404, detail="Сессия не найдена")
+        
+    if session_obj.hotel_id:
+        # Экран привязан! Отдаем slug отеля, чтобы фронтенд знал, чью музыку играть
+        hotel_result = await db.execute(select(Hotel).where(Hotel.id == session_obj.hotel_id))
+        hotel_obj = hotel_result.scalar_one_or_none()
+        return {"status": "paired", "hotel_slug": hotel_obj.slug}
+    else:
+        return {"status": "waiting"}
+
+@router.get("/api/dashboard/hotels")
+async def get_dashboard_hotels(db: AsyncSession = Depends(get_db)):
+    """Возвращает список отелей для дашборда в виде карточек"""
+    result = await db.execute(select(Hotel))
+    hotels = result.scalars().all()
+    
+    data = []
+    for h in hotels:
+        # Считаем количество привязанных экранов для каждого отеля
+        screens_res = await db.execute(
+            select(func.count(ScreenSession.id)).where(ScreenSession.hotel_id == h.id)
+        )
+        screens_count = screens_res.scalar()
+        
+        data.append({
+            "id": h.id,
+            "name": h.name,
+            "slug": h.slug,
+            "is_active": h.is_active,
+            "active_screens": screens_count
+        })
+        
+    return {"status": "ok", "hotels": data}
+
+from db.models import HotelState
+
+@router.get("/api/dashboard/hotel/{hotel_id}")
+async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db)):
+    """Отдает детальную информацию для дашборда отеля"""
+    # 1. Получаем отель
+    hotel_res = await db.execute(select(Hotel).where(Hotel.id == hotel_id))
+    hotel = hotel_res.scalar_one_or_none()
+    if not hotel:
+        raise HTTPException(status_code=404, detail="Отель не найден")
+
+    # 2. Получаем привязанные экраны
+    screens_res = await db.execute(select(ScreenSession).where(ScreenSession.hotel_id == hotel_id))
+    screens = screens_res.scalars().all()
+
+    # 3. Узнаем, какая станция сейчас играет
+    state_res = await db.execute(select(HotelState).where(HotelState.hotel_id == hotel_id))
+    state = state_res.scalar_one_or_none()
+    current_station_id = state.current_station_id if state else None
+
+    # 4. Получаем список всех доступных радиостанций
+    stations_res = await db.execute(select(Station).where(Station.is_active == True))
+    stations = stations_res.scalars().all()
+
+    return {
+        "status": "ok",
+        "hotel": {
+            "name": hotel.name,
+            "slug": hotel.slug,
+            "address": hotel.address,
+        },
+        "current_station_id": current_station_id,
+        "stations": [{"id": s.id, "title": s.title} for s in stations],
+        "screens": [{"id": s.id, "pairing_code": s.pairing_code, "created_at": s.created_at.strftime("%d.%m.%Y %H:%M")} for s in screens]
+    }
+
+@router.post("/api/dashboard/hotel/{hotel_id}/station/{station_id}")
+async def set_hotel_station(hotel_id: int, station_id: int, db: AsyncSession = Depends(get_db)):
+    """Меняет радиостанцию для всего отеля"""
+    state_res = await db.execute(select(HotelState).where(HotelState.hotel_id == hotel_id))
+    state = state_res.scalar_one_or_none()
+    
+    if state:
+        state.current_station_id = station_id
+    else:
+        state = HotelState(hotel_id=hotel_id, current_station_id=station_id)
+        db.add(state)
+        
+    await db.commit()
+    return {"status": "ok"}
+
+@router.delete("/api/screen/{session_id}")
+async def unlink_screen(session_id: int, db: AsyncSession = Depends(get_db)):
+    """Отвязывает экран от отеля (удаляет сессию)"""
+    screen_res = await db.execute(select(ScreenSession).where(ScreenSession.id == session_id))
+    screen = screen_res.scalar_one_or_none()
+    
+    if screen:
+        await db.delete(screen)
+        await db.commit()
+    return {"status": "ok"}

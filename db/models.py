@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlalchemy import String, ForeignKey, DateTime, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, Text, func
 
 # Базовый класс для всех моделей
 class Base(DeclarativeBase):
@@ -14,7 +15,7 @@ class Hotel(Base):
     slug: Mapped[str] = mapped_column(String(50), unique=True) # Уникальный хвост ссылки, например 'hilton'
     assets_path: Mapped[str] = mapped_column(String(200))      # Путь к папке с логотипами/фото
     is_active: Mapped[bool] = mapped_column(default=True)      # Активна ли подписка отеля
-    address: Mapped[str] = mapped_column(String(200), default="")
+    address: Mapped[str] = mapped_column(Text, nullable=True)
 
 class User(Base):
     __tablename__ = 'users'
@@ -39,3 +40,21 @@ class HotelState(Base):
     current_station_id: Mapped[int] = mapped_column(ForeignKey('stations.id'))
     # Время последнего переключения (сохраняется автоматически)
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+class ScreenSession(Base):
+    __tablename__ = 'screen_sessions'
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    pairing_code: Mapped[str] = mapped_column(String(6), unique=True) # Тот самый код на экране
+    auth_token: Mapped[str] = mapped_column(String(36), unique=True)  # Скрытый токен для браузера
+    hotel_id: Mapped[int] = mapped_column(ForeignKey('hotels.id'), nullable=True) # Пусто, пока админ не введет код
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+class CustomBlock(Base):
+    __tablename__ = 'custom_blocks'
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    hotel_id: Mapped[int] = mapped_column(ForeignKey('hotels.id'))
+    content: Mapped[str] = mapped_column(Text) # Текст с переносами
+    position: Mapped[str] = mapped_column(String(50), default="bottom-center") # top-left, top-center, bottom-center, center
+    is_active: Mapped[bool] = mapped_column(default=True)
