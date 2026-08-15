@@ -47,6 +47,24 @@
         .screen-info span { display: block; color: #aaa; font-size: 12px; margin-top: 5px;}
         .btn-danger { background: transparent; border: 1px solid #F44336; color: #F44336; padding: 8px 12px; border-radius: 6px; cursor: pointer;}
         .btn-danger:hover { background: #F44336; color: white; }
+        /* Сетка выбора позиции */
+        .position-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
+            width: 150px; height: 100px; background: #111; padding: 5px;
+            border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;
+        }
+        .pos-cell {
+            background: #222; border-radius: 4px; cursor: pointer; transition: 0.2s;
+            border: 2px solid transparent;
+        }
+        .pos-cell:hover { background: #333; }
+        .pos-cell.active { background: #4CAF50; border-color: white; box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
+        
+        textarea {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #333;
+            background: #111; color: white; font-family: inherit; font-size: 16px;
+            resize: vertical;
+        }
     </style>
 </head>
 <body>
@@ -76,11 +94,55 @@
                 <!-- Сюда подгрузятся экраны -->
             </div>
         </div>
+
+        <!-- Управление инфо-блоками -->
+        <div class="panel">
+            <h2>Инфо-блоки (Текст на экране)</h2>
+            <div id="blocks-list" style="margin-bottom: 25px;">
+                <!-- Сюда подгрузятся текущие блоки -->
+            </div>
+
+            <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                <h3 style="font-size: 14px; color: #888; margin-top: 0;">Добавить новый блок</h3>
+                
+                <div class="form-group">
+                    <label>Расположение на экране</label>
+                    <div class="position-grid" id="pos-grid">
+                        <div class="pos-cell" data-pos="top-left"></div>
+                        <div class="pos-cell" data-pos="top-center"></div>
+                        <div class="pos-cell" data-pos="top-right"></div>
+                        <div class="pos-cell" data-pos="center-left"></div>
+                        <div class="pos-cell active" data-pos="center"></div>
+                        <div class="pos-cell" data-pos="center-right"></div>
+                        <div class="pos-cell" data-pos="bottom-left"></div>
+                        <div class="pos-cell" data-pos="bottom-center"></div>
+                        <div class="pos-cell" data-pos="bottom-right"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Текст (можно использовать Enter)</label>
+                    <textarea id="block-content" rows="3" placeholder="Добро пожаловать!&#10;Wi-Fi: Hotel_Free&#10;Pass: 12345678"></textarea>
+                </div>
+                
+                <button class="btn" onclick="addBlock()">Добавить на экран</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
+const urlParams = new URLSearchParams(window.location.search);
         const hotelId = urlParams.get('hotel_id');
+        let selectedPosition = 'center'; // Позиция по умолчанию
+
+        // Захват клика по интерактивной сетке
+        document.querySelectorAll('.pos-cell').forEach(cell => {
+            cell.addEventListener('click', function() {
+                document.querySelectorAll('.pos-cell').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                selectedPosition = this.getAttribute('data-pos');
+            });
+        });
 
         async function loadHotelData() {
             const res = await fetch(`/api/dashboard/hotel/${hotelId}`);
@@ -89,7 +151,7 @@
             if (data.status === 'ok') {
                 document.getElementById('hotel-title').innerText = data.hotel.name;
                 
-                // Заполняем станции
+                // Рендер станций
                 const select = document.getElementById('station-select');
                 select.innerHTML = '';
                 data.stations.forEach(st => {
@@ -100,7 +162,7 @@
                     select.appendChild(option);
                 });
 
-                // Заполняем экраны
+                // Рендер телевизоров
                 const list = document.getElementById('screens-list');
                 list.innerHTML = '';
                 if (data.screens.length === 0) {
@@ -118,6 +180,24 @@
                         `;
                     });
                 }
+
+                // Рендер инфо-блоков
+                const blocksList = document.getElementById('blocks-list');
+                blocksList.innerHTML = '';
+                if (data.blocks && data.blocks.length > 0) {
+                    data.blocks.forEach(b => {
+                        blocksList.innerHTML += `
+                            <div class="screen-item">
+                                <div class="screen-info" style="white-space: pre-wrap; font-size: 14px;">${b.content}
+                                    <span>Позиция: ${b.position}</span>
+                                </div>
+                                <button class="btn-danger" onclick="deleteBlock(${b.id})">Удалить</button>
+                            </div>
+                        `;
+                    });
+                } else {
+                    blocksList.innerHTML = '<p style="color:#666;">Нет активных блоков</p>';
+                }
             }
         }
 
@@ -130,11 +210,32 @@
         async function unlinkScreen(sessionId) {
             if(confirm('Точно отвязать этот экран? Телевизор перестанет играть музыку.')) {
                 await fetch(`/api/screen/${sessionId}`, { method: 'DELETE' });
-                loadHotelData(); // Перезагружаем список
+                loadHotelData();
             }
         }
 
-        // Старт
+        // Логика добавления и удаления блоков
+        async function addBlock() {
+            const content = document.getElementById('block-content').value;
+            if (!content) return alert('Введите текст блока');
+
+            await fetch(`/api/dashboard/hotel/${hotelId}/block`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content, position: selectedPosition })
+            });
+            
+            document.getElementById('block-content').value = ''; 
+            loadHotelData();
+        }
+
+        async function deleteBlock(blockId) {
+            if(confirm('Удалить этот блок с экрана?')) {
+                await fetch(`/api/block/${blockId}`, { method: 'DELETE' });
+                loadHotelData();
+            }
+        }
+
         if (hotelId) {
             loadHotelData();
         } else {

@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy import func
 from db.models import CustomBlock
+from pydantic import BaseModel
+from db.models import CustomBlock
 
 from db.database import AsyncSessionLocal
 from db.models import Hotel, HotelState, Station, ScreenSession
@@ -17,53 +19,43 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
+# Схема для приема данных с фронтенда
+class BlockCreate(BaseModel):
+    content: str
+    position: str
+
 @router.get("/api/display")
 async def get_display_data(hotel: str, db: AsyncSession = Depends(get_db)):
-    """
-    Этот эндпоинт опрашивают телевизоры. 
-    Пример запроса: GET /api/display?hotel=plaza
-    """
+    hotel_obj = await db.execute(select(Hotel).where(Hotel.slug == hotel))
+    h = hotel_obj.scalar_one_or_none()
     
-    # 1. Ищем отель по slug (например, 'plaza')
-    result = await db.execute(select(Hotel).where(Hotel.slug == hotel))
-    hotel_obj = result.scalar_one_or_none()
+    if not h:
+        return {"status": "error"}
+        
+    # --- Получаем музыку ---
+    state_obj = await db.execute(select(HotelState).where(HotelState.hotel_id == h.id))
+    state = state_obj.scalar_one_or_none()
+    
+    station = {"title": "", "url": ""}
+    if state:
+        st_obj = await db.execute(select(Station).where(Station.id == state.current_station_id))
+        st = st_obj.scalar_one_or_none()
+        if st:
+            station = {"title": st.title, "url": st.stream_url}
 
-    if not hotel_obj:
-        raise HTTPException(status_code=404, detail="Отель не найден")
+    # --- ПОЛУЧАЕМ ИНФО-БЛОКИ ---
+    blocks_res = await db.execute(select(CustomBlock).where(CustomBlock.hotel_id == h.id, CustomBlock.is_active == True))
+    blocks = blocks_res.scalars().all()
 
-    # Если отель не оплатил подписку
-    if not hotel_obj.is_active:
-        return {"status": "error", "message": "Подписка неактивна"}
-
-    # 2. Узнаем, какую станцию админ включил в боте
-    state_result = await db.execute(select(HotelState).where(HotelState.hotel_id == hotel_obj.id))
-    state_obj = state_result.scalar_one_or_none()
-
-    # Дефолтные значения (если отель только добавили и админ еще ничего не нажал)
-    station_title = "Ожидание станции..."
-    stream_url = ""
-
-    if state_obj:
-        # 3. Достаем саму ссылку на радиостанцию
-        station_result = await db.execute(select(Station).where(Station.id == state_obj.current_station_id))
-        station_obj = station_result.scalar_one_or_none()
-        if station_obj and station_obj.is_active:
-            station_title = station_obj.title
-            stream_url = station_obj.stream_url
-
-    # 4. Формируем красивый JSON для телевизора
     return {
         "status": "ok",
         "hotel": {
-            "name": hotel_obj.name,
-            # Телевизор поймет, что картинки надо искать по этому пути
-            "assets_path": hotel_obj.assets_path,
-            "address": hotel_obj.address
+            "name": h.name,
+            "address": h.address,
+            "assets_path": h.assets_path
         },
-        "station": {
-            "title": station_title,
-            "url": stream_url
-        }
+        "station": station,
+        "blocks": [{"content": b.content, "position": b.position} for b in blocks] # Отдаем блоки массивом
     }
 
 # Место для твоего прокси погоды 
@@ -140,8 +132,6 @@ async def get_dashboard_hotels(db: AsyncSession = Depends(get_db)):
         
     return {"status": "ok", "hotels": data}
 
-from db.models import HotelState
-
 @router.get("/api/dashboard/hotel/{hotel_id}")
 async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db)):
     """Отдает детальную информацию для дашборда отеля"""
@@ -151,18 +141,18 @@ async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db)):
     if not hotel:
         raise HTTPException(status_code=404, detail="Отель не найден")
 
-    # 2. Получаем привязанные экраны
     screens_res = await db.execute(select(ScreenSession).where(ScreenSession.hotel_id == hotel_id))
     screens = screens_res.scalars().all()
 
-    # 3. Узнаем, какая станция сейчас играет
     state_res = await db.execute(select(HotelState).where(HotelState.hotel_id == hotel_id))
     state = state_res.scalar_one_or_none()
     current_station_id = state.current_station_id if state else None
 
-    # 4. Получаем список всех доступных радиостанций
     stations_res = await db.execute(select(Station).where(Station.is_active == True))
     stations = stations_res.scalars().all()
+
+    blocks_res = await db.execute(select(CustomBlock).where(CustomBlock.hotel_id == hotel_id))
+    blocks = blocks_res.scalars().all()
 
     return {
         "status": "ok",
@@ -170,11 +160,34 @@ async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db)):
             "name": hotel.name,
             "slug": hotel.slug,
             "address": hotel.address,
+            "blocks": [{"id": b.id, "content": b.content, "position": b.position} for b in blocks]
         },
         "current_station_id": current_station_id,
         "stations": [{"id": s.id, "title": s.title} for s in stations],
         "screens": [{"id": s.id, "pairing_code": s.pairing_code, "created_at": s.created_at.strftime("%d.%m.%Y %H:%M")} for s in screens]
     }
+
+# 2. НОВЫЙ МАРШРУТ: Добавление блока
+@router.post("/api/dashboard/hotel/{hotel_id}/block")
+async def add_custom_block(hotel_id: int, block: BlockCreate, db: AsyncSession = Depends(get_db)):
+    new_block = CustomBlock(
+        hotel_id=hotel_id, 
+        content=block.content, 
+        position=block.position
+    )
+    db.add(new_block)
+    await db.commit()
+    return {"status": "ok"}
+
+# 3. НОВЫЙ МАРШРУТ: Удаление блока
+@router.delete("/api/block/{block_id}")
+async def delete_block(block_id: int, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(CustomBlock).where(CustomBlock.id == block_id))
+    b = res.scalar_one_or_none()
+    if b:
+        await db.delete(b)
+        await db.commit()
+    return {"status": "ok"}
 
 @router.post("/api/dashboard/hotel/{hotel_id}/station/{station_id}")
 async def set_hotel_station(hotel_id: int, station_id: int, db: AsyncSession = Depends(get_db)):

@@ -39,7 +39,28 @@
             font-size: 22px; font-weight: 200; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);
             display: flex; align-items: center; gap: 12px;
         }
-        #hotel-address { position: absolute; bottom: 40px; right: 50px; font-size: 18px; }
+        #hotel-address { position: absolute; bottom: 40px; right: 50px; font-size: 18px; white-space: pre-wrap; text-align: right; line-height: 1.4; }
+
+        .custom-block {
+            position: absolute; z-index: 5;
+            background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1); padding: 15px 25px; border-radius: 20px;
+            font-size: 20px; font-weight: 300; letter-spacing: 2px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            white-space: pre-wrap; text-align: center; line-height: 1.4;
+        }
+
+/* 9 Позиций на экране */
+        .pos-top-left { top: 40px; left: 50px; }
+        .pos-top-center { top: 40px; left: 50%; transform: translateX(-50%); }
+        .pos-top-right { top: 40px; right: 50px; }
+        
+        .pos-center-left { top: 50%; left: 50px; transform: translateY(-50%); }
+        .pos-center { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .pos-center-right { top: 50%; right: 50px; transform: translateY(-50%); }
+        
+        .pos-bottom-left { bottom: 40px; left: 50px; }
+        .pos-bottom-center { bottom: 40px; left: 50%; transform: translateX(-50%); }
+        .pos-bottom-right { bottom: 40px; right: 50px; text-align: right; }
         
         @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-15px); } 100% { transform: translateY(0px); } }
         #hotel-logo { max-width: 300px; max-height: 200px; margin-bottom: 30px; display: none; animation: float 6s ease-in-out infinite; }
@@ -113,7 +134,7 @@
                 overlay.classList.remove('hidden');              // PRESS OK
                 return; // Выходим из функции, авторизация через бота не нужна
             }
-            
+
             let token = localStorage.getItem('auth_token');
             let hotelSlug = localStorage.getItem('hotel_slug');
 
@@ -172,8 +193,23 @@
                 if (data.status === 'ok') {
                     document.getElementById('hotel-name').innerText = data.hotel.name;
                     document.getElementById('station-name').innerText = data.station.title; 
+                    
+                    // Адрес теперь поддерживает Enter
                     document.getElementById('hotel-address').innerText = data.hotel.address || "";
 
+                    // --- РЕНДЕР ИНФО-БЛОКОВ ---
+                    // Удаляем старые блоки перед обновлением
+                    document.querySelectorAll('.custom-block').forEach(el => el.remove());
+                    
+                    // Создаем новые
+                    if (data.blocks) {
+                        data.blocks.forEach(b => {
+                            const el = document.createElement('div');
+                            el.className = `custom-block pos-${b.position}`;
+                            el.innerText = b.content; // textInner тоже сохраняет переносы
+                            document.body.appendChild(el);
+                        });
+                    }
                     const assetsPath = data.hotel.assets_path;
                     const hotelLogo = document.getElementById('hotel-logo');
                     hotelLogo.src = `/public/${assetsPath}/logo.png`;
