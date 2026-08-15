@@ -36,10 +36,10 @@ async def seed_data():
 
             # 3. Создаем отель (включая адрес для правого нижнего угла)
             plaza = Hotel(
-                name="Plaza Hotel", 
+                name="Kaznacheyskiy Hotel", 
                 slug="plaza", 
                 assets_path="hotels/plaza",
-                address="ул. Ленина, 1 • 1 Lenin Street", # <--- Добавили адрес
+                address="ул. Большой Златоустинский переулок, 7с1 • 71 Big Zlatoustinsky Lane",
                 is_active=True
             )
             db.add(plaza)

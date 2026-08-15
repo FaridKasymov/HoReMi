@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from db.models import Base
 
 # Файл базы данных будет создан в корне проекта
-DATABASE_URL = "sqlite+aiosqlite:///./hotel_saas.db"
+DATABASE_URL = "sqlite+aiosqlite:///./db/database.db"
 
 # Создаем асинхронный движок
 engine = create_async_engine(DATABASE_URL, echo=False)
