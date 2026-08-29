@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>HoReMi — управление</title>
+  <style>
+    :root {
+      --ink: #20231f;
+      --muted: #777a72;
+      --line: #deddd4;
+      --paper: #f3f1ea;
+      --surface: #fbfaf6;
+      --surface-2: #ebe8df;
+      --dark: #1e211d;
+      --dark-2: #292d27;
+      --accent: #c6784d;
+      --accent-soft: #f0d8c9;
+      --green: #57745f;
+      --green-soft: #dce7de;
+      --danger: #a84d45;
+      --shadow: 0 18px 50px rgba(42, 39, 32, .09);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, textarea, select { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { color: inherit; }
+
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 254px minmax(0, 1fr); }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 30px 22px 22px;
+      color: #f6f2e9;
+      background: var(--dark);
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+    }
+    .brand { padding: 0 12px 34px; }
+    .brand-name { font-family: Georgia, "Times New Roman", serif; font-size: 30px; letter-spacing: -.03em; }
+    .brand-caption { margin-top: 5px; color: #969b90; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; }
+    .nav-label { padding: 0 13px 10px; color: #777d72; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    .nav { display: grid; gap: 5px; }
+    .nav-btn {
+      width: 100%;
+      border: 0;
+      border-radius: 13px;
+      padding: 13px 14px;
+      color: #aeb3a9;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: background .18s ease, color .18s ease;
+    }
+    .nav-btn:hover { color: #fff; background: #282c27; }
+    .nav-btn.active { color: #fff; background: var(--dark-2); }
+    .nav-icon { width: 18px; text-align: center; opacity: .9; }
+    .nav-count { margin-left: auto; color: #777d72; font-size: 11px; }
+    .sidebar-foot { margin-top: auto; padding: 20px 12px 3px; border-top: 1px solid #363a34; color: #777d72; font-size: 11px; line-height: 1.55; }
+    .sidebar-foot strong { color: #d4d5ce; font-weight: 600; }
+
+    .main { min-width: 0; padding: 0 44px 64px; }
+    .topbar {
+      min-height: 94px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .eyebrow { margin-bottom: 7px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp(28px, 3vw, 42px); font-weight: 400; letter-spacing: -.035em; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .sync-state { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+    .btn {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 16px;
+      background: var(--surface);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform .15s ease, border-color .15s ease, background .15s ease;
+    }
+    .btn:hover { transform: translateY(-1px); border-color: #c8c5b9; }
+    .btn.primary { border-color: var(--dark); color: #fff; background: var(--dark); }
+    .btn.primary:hover { background: #30352e; }
+    .btn.ghost { background: transparent; }
+    .btn.danger { color: var(--danger); }
+    .btn.small { min-height: 35px; padding: 0 12px; border-radius: 10px; font-size: 12px; }
+    .icon-btn { width: 42px; padding: 0; }
+
+    .view { display: none; padding-top: 34px; animation: enter .25s ease both; }
+    .view.active { display: block; }
+    @keyframes enter { from { opacity: 0; transform: translateY(6px); } }
+    .section-head { margin-bottom: 22px; display: flex; align-items: end; justify-content: space-between; gap: 20px; }
+    .section-head h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 28px; font-weight: 400; letter-spacing: -.02em; }
+    .section-note { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+
+    .hero {
+      min-height: 218px;
+      border-radius: 28px;
+      padding: 34px 38px;
+      color: #f7f3ea;
+      background: #33372f;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr);
+      gap: 34px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .hero-kicker { color: #aeb5a8; font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+    .hero h2 { max-width: 620px; margin: 20px 0 12px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(30px, 4vw, 52px); font-weight: 400; line-height: .98; letter-spacing: -.04em; }
+    .hero p { max-width: 540px; margin: 0; color: #bec2b9; font-size: 14px; line-height: 1.6; }
+    .hero-side { border-left: 1px solid #53584e; padding-left: 32px; align-self: stretch; display: flex; flex-direction: column; justify-content: space-between; }
+    .hero-side-label { color: #969d92; font-size: 10px; letter-spacing: .15em; text-transform: uppercase; }
+    .hero-online { margin: 10px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: 52px; }
+    .hero-online small { color: #9ea499; font-family: inherit; font-size: 22px; }
+    .hero-link { color: #f7f3ea; font-size: 12px; text-decoration: none; }
+
+    .stats-grid { margin-top: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .stat-card { min-height: 135px; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; background: var(--surface); }
+    .stat-top { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; }
+    .stat-icon { width: 29px; height: 29px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; }
+    .stat-value { margin-top: 20px; font-family: Georgia, "Times New Roman", serif; font-size: 35px; line-height: 1; }
+    .stat-value small { color: var(--muted); font-family: Inter, sans-serif; font-size: 11px; }
+
+    .overview-grid { margin-top: 34px; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr); gap: 28px; }
+    .panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+    .panel-head { min-height: 70px; padding: 0 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .panel-title { font-family: Georgia, "Times New Roman", serif; font-size: 20px; }
+    .text-btn { border: 0; padding: 6px; color: var(--muted); background: transparent; cursor: pointer; font-size: 12px; }
+    .text-btn:hover { color: var(--ink); }
+    .activity-list { min-height: 210px; }
+    .activity { padding: 17px 22px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+    .activity:last-child { border: 0; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
+    .status-dot.online { background: #6d9c79; box-shadow: 0 0 0 4px #e7efe8; }
+    .activity strong { display: block; font-size: 13px; font-weight: 600; }
+    .activity span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+    .activity time { color: var(--muted); font-size: 11px; }
+    .quick-actions { padding: 18px; display: grid; gap: 10px; }
+    .quick-action { border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: transparent; display: flex; align-items: center; gap: 13px; cursor: pointer; text-align: left; }
+    .quick-action:hover { border-color: #c5c1b4; background: #fff; }
+    .quick-mark { width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; font-size: 17px; }
+    .quick-action strong { display: block; font-size: 12px; }
+    .quick-action span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+
+    .toolbar { margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .search { position: relative; max-width: 360px; flex: 1; }
+    .search input { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 12px; padding: 0 16px 0 40px; color: var(--ink); background: var(--surface); outline: none; }
+    .search input:focus { border-color: #aaa79b; box-shadow: 0 0 0 3px rgba(89, 89, 75, .08); }
+    .search::before { content: "⌕"; position: absolute; left: 15px; top: 10px; color: var(--muted); font-size: 19px; }
+    .filter-note { color: var(--muted); font-size: 12px; }
+
+    .hotel-grid { display: grid; grid-template-columns: repeat(3, minmax(260px, 1fr)); gap: 16px; }
+    .hotel-card { min-height: 276px; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; background: var(--surface); display: flex; flex-direction: column; transition: transform .2s ease, box-shadow .2s ease; }
+    .hotel-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .hotel-card-top { display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+    .hotel-monogram { width: 44px; height: 44px; border-radius: 50%; color: #fff; background: var(--dark-2); display: grid; place-items: center; font-family: Georgia, serif; font-size: 17px; }
+    .badge { border-radius: 999px; padding: 6px 9px; color: var(--muted); background: var(--surface-2); font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .badge.active { color: var(--green); background: var(--green-soft); }
+    .badge.off { color: var(--danger); background: #f0dcda; }
+    .hotel-card h3 { margin: 24px 0 5px; font-family: Georgia, "Times New Roman", serif; font-size: 23px; font-weight: 400; }
+    .slug { color: var(--muted); font-size: 11px; }
+    .hotel-meta { margin: 20px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .hotel-meta div { border-left: 1px solid var(--line); padding-left: 11px; }
+    .hotel-meta span { display: block; color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .hotel-meta strong { display: block; margin-top: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hotel-card-actions { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+    .hotel-card-actions .btn { flex: 1; }
+
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { height: 48px; padding: 0 18px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .11em; text-align: left; text-transform: uppercase; }
+    .data-table td { height: 73px; padding: 11px 18px; border-bottom: 1px solid var(--line); font-size: 12px; vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: 0; }
+    .data-table tbody tr:hover { background: #f7f5ef; }
+    .primary-cell { display: flex; align-items: center; gap: 12px; }
+    .row-mark { width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; }
+    .primary-cell strong { display: block; font-size: 12px; }
+    .primary-cell small, .url-cell { display: block; max-width: 300px; margin-top: 4px; color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row-actions { display: flex; justify-content: flex-end; gap: 7px; }
+    .empty { min-height: 220px; padding: 40px; color: var(--muted); display: grid; place-items: center; text-align: center; }
+    .empty strong { display: block; margin-bottom: 7px; color: var(--ink); font-family: Georgia, serif; font-size: 20px; font-weight: 400; }
+
+    dialog { width: min(540px, calc(100vw - 30px)); max-height: calc(100vh - 30px); border: 0; border-radius: 24px; padding: 0; color: var(--ink); background: var(--surface); box-shadow: 0 30px 100px rgba(23, 25, 22, .3); }
+    dialog::backdrop { background: rgba(26, 28, 25, .58); backdrop-filter: blur(4px); }
+    .modal-head { min-height: 82px; padding: 0 25px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+    .modal-head h3 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 400; }
+    .modal-close { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 50%; background: transparent; cursor: pointer; }
+    .modal-body { padding: 25px; overflow-y: auto; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .field { display: grid; gap: 8px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .field input, .field textarea, .field select { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; color: var(--ink); background: #fff; outline: none; }
+    .field textarea { min-height: 82px; resize: vertical; line-height: 1.5; }
+    .field input:focus, .field textarea:focus, .field select:focus { border-color: #9e9c91; box-shadow: 0 0 0 3px rgba(89, 89, 75, .08); }
+    .field-hint { color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .switch-row { min-height: 56px; border: 1px solid var(--line); border-radius: 13px; padding: 10px 13px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+    .switch-row strong { display: block; font-size: 12px; }
+    .switch-row span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .switch { position: relative; width: 42px; height: 24px; flex: 0 0 auto; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch-ui { position: absolute; inset: 0; border-radius: 999px; background: #c8c7bf; cursor: pointer; transition: .2s; }
+    .switch-ui::after { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; border-radius: 50%; background: #fff; transition: .2s; }
+    .switch input:checked + .switch-ui { background: var(--green); }
+    .switch input:checked + .switch-ui::after { transform: translateX(18px); }
+    .modal-actions { margin-top: 24px; display: flex; justify-content: flex-end; gap: 9px; }
+
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 80; max-width: 390px; border-radius: 14px; padding: 14px 17px; color: #fff; background: var(--dark); box-shadow: var(--shadow); font-size: 12px; transform: translateY(20px); opacity: 0; pointer-events: none; transition: .2s ease; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.error { background: var(--danger); }
+    .loading { opacity: .55; pointer-events: none; }
+    .mobile-menu { display: none; }
+
+    @media (max-width: 1120px) {
+      .hotel-grid { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+      .overview-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 780px) {
+      .shell { display: block; }
+      .sidebar { position: fixed; left: 0; top: 0; width: 260px; transform: translateX(-105%); transition: transform .2s ease; box-shadow: 20px 0 50px rgba(0,0,0,.18); }
+      .sidebar.open { transform: translateX(0); }
+      .main { padding: 0 18px 45px; overflow: hidden; }
+      .topbar { min-height: 78px; padding: 14px 0; flex-wrap: wrap; }
+      .topbar > div:first-child { min-width: 0; }
+      .topbar h1 { font-size: 30px; }
+      .top-actions { width: 100%; }
+      #context-action { flex: 1; }
+      .mobile-menu { display: inline-flex; }
+      .sync-state { display: none; }
+      .hero { grid-template-columns: 1fr; padding: 28px; }
+      .hero-side { min-height: 100px; border: 0; border-top: 1px solid #53584e; padding: 22px 0 0; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .hotel-grid { grid-template-columns: 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .table-wrap { width: 100%; max-width: 100%; overflow-x: auto; }
+      .data-table { min-width: 720px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-name">HoReMi</div>
+        <div class="brand-caption">Hotel sound system</div>
+      </div>
+      <div class="nav-label">Управление</div>
+      <nav class="nav">
+        <button class="nav-btn active" data-view="overview"><span class="nav-icon">⌂</span>Обзор</button>
+        <button class="nav-btn" data-view="hotels"><span class="nav-icon">◇</span>Отели<span class="nav-count" id="nav-hotels">—</span></button>
+        <button class="nav-btn" data-view="stations"><span class="nav-icon">◉</span>Радиостанции<span class="nav-count" id="nav-stations">—</span></button>
+        <button class="nav-btn" data-view="devices"><span class="nav-icon">▣</span>Телевизоры<span class="nav-count" id="nav-devices">—</span></button>
+      </nav>
+      <div class="sidebar-foot"><strong>Локальная панель</strong><br>Доступна устройствам в вашей домашней сети.</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div style="display:flex;align-items:center;gap:13px">
+          <button class="btn icon-btn mobile-menu" id="menu-btn" aria-label="Меню">☰</button>
+          <div><div class="eyebrow" id="page-kicker">Панель управления</div><h1 id="page-title">Обзор</h1></div>
+        </div>
+        <div class="top-actions">
+          <div class="sync-state"><span class="sync-dot"></span><span id="sync-text">Данные актуальны</span></div>
+          <button class="btn icon-btn" id="refresh-btn" title="Обновить">↻</button>
+          <button class="btn primary" id="context-action">＋ Добавить отель</button>
+        </div>
+      </header>
+
+      <section class="view active" id="view-overview">
+        <div class="hero">
+          <div>
+            <div class="hero-kicker">Состояние системы</div>
+            <h2>Всё, что звучит<br>в ваших отелях.</h2>
+            <p>Отели, музыка и телевизоры теперь собраны в одном месте. Изменения применяются к экранам автоматически.</p>
+          </div>
+          <div class="hero-side">
+            <div><div class="hero-side-label">Телевизоры сейчас</div><div class="hero-online"><span id="hero-online">—</span><small> / <span id="hero-total">—</span></small></div></div>
+            <button class="text-btn hero-link" data-go="devices">Открыть список телевизоров →</button>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-top"><span>Отели</span><span class="stat-icon">◇</span></div><div class="stat-value" id="stat-hotels">—</div></div>
+          <div class="stat-card"><div class="stat-top"><span>Активные экраны</span><span class="stat-icon">▣</span></div><div class="stat-value" id="stat-devices">—</div></div>
+          <div class="stat-card"><div class="stat-top"><span>Радиостанции</span><span class="stat-icon">◉</span></div><div class="stat-value" id="stat-stations">—</div></div>
+        </div>
+        <div class="overview-grid">
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Последние телевизоры</span><button class="text-btn" data-go="devices">Смотреть все →</button></div>
+            <div class="activity-list" id="recent-devices"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Быстрые действия</span></div>
+            <div class="quick-actions">
+              <button class="quick-action" data-action="add-hotel"><span class="quick-mark">＋</span><span><strong>Новый отель</strong><span>Добавить карточку и экран</span></span></button>
+              <button class="quick-action" data-action="add-station"><span class="quick-mark">◉</span><span><strong>Новая станция</strong><span>Подключить аудиопоток</span></span></button>
+              <button class="quick-action" data-go="devices"><span class="quick-mark">#</span><span><strong>Коды подключения</strong><span>Проверить ожидающие ТВ</span></span></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-hotels">
+        <div class="section-head"><div><h2>Все отели</h2><p class="section-note">Настройки экранов и музыки для каждого объекта.</p></div></div>
+        <div class="toolbar"><div class="search"><input id="hotel-search" placeholder="Найти отель"></div><div class="filter-note" id="hotels-note"></div></div>
+        <div class="hotel-grid" id="hotel-grid"></div>
+      </section>
+
+      <section class="view" id="view-stations">
+        <div class="section-head"><div><h2>Радиостанции</h2><p class="section-note">Общий каталог потоков, доступный всем отелям.</p></div></div>
+        <div class="toolbar"><div class="search"><input id="station-search" placeholder="Найти станцию"></div><div class="filter-note" id="stations-note"></div></div>
+        <div class="panel table-wrap"><table class="data-table"><thead><tr><th>Станция</th><th>Поток</th><th>Отели</th><th>Статус</th><th></th></tr></thead><tbody id="station-rows"></tbody></table></div>
+      </section>
+
+      <section class="view" id="view-devices">
+        <div class="section-head"><div><h2>Телевизоры</h2><p class="section-note">Все экраны, подключённые через одноразовый код.</p></div></div>
+        <div class="toolbar"><div class="search"><input id="device-search" placeholder="Отель, название или ID"></div><div class="filter-note" id="devices-note"></div></div>
+        <div class="panel table-wrap"><table class="data-table"><thead><tr><th>Телевизор</th><th>Отель</th><th>Последняя связь</th><th>Статус</th><th></th></tr></thead><tbody id="device-rows"></tbody></table></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="modal"><div class="modal-head"><h3 id="modal-title"></h3><button class="modal-close" type="button" id="modal-close">×</button></div><form class="modal-body" id="modal-form"><div id="modal-fields"></div><div class="modal-actions"><button class="btn ghost" type="button" id="modal-cancel">Отмена</button><button class="btn primary" type="submit" id="modal-submit">Сохранить</button></div></form></dialog>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const state = { overview: null, hotels: [], stations: [], devices: [], view: 'overview', modal: null };
+    const titles = {
+      overview: ['Панель управления', 'Обзор'],
+      hotels: ['Объекты', 'Отели'],
+      stations: ['Аудиокаталог', 'Радиостанции'],
+      devices: ['Подключения', 'Телевизоры']
+    };
+    const $ = selector => document.querySelector(selector);
+    const $$ = selector => [...document.querySelectorAll(selector)];
+
+    function escapeHtml(value = '') {
+      return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    }
+    function initials(name = '') { return name.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || 'H'; }
+    function relativeTime(value) {
+      if (!value) return 'нет данных';
+      const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
+      if (seconds < 60) return 'только что';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)} мин назад`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)} ч назад`;
+      return new Date(value).toLocaleDateString('ru-RU', {day:'2-digit', month:'short'});
+    }
+    function notify(message, error = false) {
+      const toast = $('#toast');
+      toast.textContent = message; toast.className = `toast show${error ? ' error' : ''}`;
+      clearTimeout(notify.timer); notify.timer = setTimeout(() => toast.className = 'toast', 3000);
+    }
+    async function api(url, options = {}) {
+      const response = await fetch(url, { headers: {'Content-Type':'application/json', ...(options.headers || {})}, ...options });
+      let data = {};
+      try { data = await response.json(); } catch (_) {}
+      if (!response.ok) throw new Error(data.detail || 'Не удалось выполнить запрос');
+      return data;
+    }
+
+    function showView(name) {
+      state.view = name;
+      $$('.view').forEach(el => el.classList.toggle('active', el.id === `view-${name}`));
+      $$('.nav-btn').forEach(el => el.classList.toggle('active', el.dataset.view === name));
+      $('#page-kicker').textContent = titles[name][0]; $('#page-title').textContent = titles[name][1];
+      const button = $('#context-action');
+      if (name === 'stations') { button.textContent = '＋ Добавить станцию'; button.dataset.action = 'add-station'; }
+      else if (name === 'devices') { button.textContent = 'Как подключить ТВ'; button.dataset.action = 'pair-help'; }
+      else { button.textContent = '＋ Добавить отель'; button.dataset.action = 'add-hotel'; }
+      $('#sidebar').classList.remove('open');
+      history.replaceState(null, '', name === 'overview' ? '/admin' : `/admin#${name}`);
+    }
+
+    function renderOverview() {
+      const stats = state.overview?.stats || {};
+      $('#hero-online').textContent = stats.online_devices ?? '—'; $('#hero-total').textContent = stats.devices ?? '—';
+      $('#stat-hotels').innerHTML = `${stats.hotels ?? '—'} <small>${stats.active_hotels ?? 0} активны</small>`;
+      $('#stat-devices').innerHTML = `${stats.online_devices ?? '—'} <small>из ${stats.devices ?? 0} онлайн</small>`;
+      $('#stat-stations').innerHTML = `${stats.active_stations ?? '—'} <small>из ${stats.stations ?? 0} активны</small>`;
+      const recent = state.overview?.recent_devices || [];
+      $('#recent-devices').innerHTML = recent.length ? recent.map(device => {
+        const hotel = state.hotels.find(h => h.id === device.hotel_id);
+        return `<div class="activity"><span class="status-dot ${device.is_online ? 'online' : ''}"></span><div><strong>${escapeHtml(device.name || 'Телевизор')}</strong><span>${escapeHtml(hotel?.name || 'Ожидает привязки')}</span></div><time>${relativeTime(device.last_seen)}</time></div>`;
+      }).join('') : '<div class="empty"><div><strong>Пока нет телевизоров</strong>Откройте заставку на ТВ, чтобы получить код подключения.</div></div>';
+    }
+
+    function renderHotels() {
+      const query = $('#hotel-search').value.trim().toLowerCase();
+      const hotels = state.hotels.filter(h => `${h.name} ${h.slug} ${h.address}`.toLowerCase().includes(query));
+      $('#hotels-note').textContent = `${hotels.length} ${hotels.length === 1 ? 'отель' : 'отелей'}`;
+      $('#hotel-grid').innerHTML = hotels.length ? hotels.map(hotel => `
+        <article class="hotel-card">
+          <div class="hotel-card-top"><span class="hotel-monogram">${escapeHtml(initials(hotel.name))}</span><span class="badge ${hotel.is_active ? 'active' : 'off'}">${hotel.is_active ? 'Активен' : 'Отключён'}</span></div>
+          <h3>${escapeHtml(hotel.name)}</h3><div class="slug">horemi.local/${escapeHtml(hotel.slug)}</div>
+          <div class="hotel-meta"><div><span>Телевизоры</span><strong>${hotel.devices_online} онлайн · ${hotel.devices_total} всего</strong></div><div><span>Сейчас играет</span><strong>${escapeHtml(hotel.station?.title || 'Не выбрано')}</strong></div></div>
+          <div class="hotel-card-actions"><button class="btn small" onclick="openHotel(${hotel.id})">Настроить</button><a class="btn small ghost" href="/public/index.html?hotel=${encodeURIComponent(hotel.slug)}" target="_blank">Экран ↗</a></div>
+        </article>`).join('') : '<div class="panel empty" style="grid-column:1/-1"><div><strong>Ничего не найдено</strong>Попробуйте изменить запрос или добавьте новый отель.</div></div>';
+    }
+
+    function renderStations() {
+      const query = $('#station-search').value.trim().toLowerCase();
+      const stations = state.stations.filter(s => `${s.title} ${s.stream_url}`.toLowerCase().includes(query));
+      $('#stations-note').textContent = `${stations.length} в каталоге`;
+      $('#station-rows').innerHTML = stations.length ? stations.map(station => `<tr>
+        <td><div class="primary-cell"><span class="row-mark">◉</span><div><strong>${escapeHtml(station.title)}</strong><small>${escapeHtml(station.status || `ID ${station.id}`)}</small></div></div></td>
+        <td><span class="url-cell" title="${escapeHtml(station.stream_url)}">${escapeHtml(station.stream_url)}</span></td><td>${station.hotels_count}</td>
+        <td><span class="badge ${station.is_active ? 'active' : 'off'}">${station.is_active ? 'Активна' : 'Выключена'}</span></td>
+        <td><div class="row-actions"><button class="btn small" onclick="openStation(${station.id})">Изменить</button><button class="btn small danger" onclick="removeStation(${station.id})">Удалить</button></div></td>
+      </tr>`).join('') : '<tr><td colspan="5"><div class="empty"><div><strong>Станций пока нет</strong>Добавьте первую ссылку на аудиопоток.</div></div></td></tr>';
+    }
+
+    function renderDevices() {
+      const query = $('#device-search').value.trim().toLowerCase();
+      const devices = state.devices.filter(d => `${d.name} ${d.hotel_name || ''} ${d.device_uid}`.toLowerCase().includes(query));
+      $('#devices-note').textContent = `${devices.filter(d => d.is_online).length} онлайн · ${devices.length} всего`;
+      $('#device-rows').innerHTML = devices.length ? devices.map(device => `<tr>
+        <td><div class="primary-cell"><span class="row-mark">▣</span><div><strong>${escapeHtml(device.name || 'Телевизор')}</strong><small>${escapeHtml(device.device_uid.slice(0, 14))}…${device.pairing_code ? ` · код ${escapeHtml(device.pairing_code)}` : ''}</small></div></div></td>
+        <td>${escapeHtml(device.hotel_name || 'Не привязан')}</td><td>${relativeTime(device.last_seen)}</td>
+        <td><span class="badge ${device.is_online ? 'active' : ''}">${device.is_online ? 'Онлайн' : 'Не в сети'}</span></td>
+        <td><div class="row-actions"><button class="btn small" onclick="openDevice(${device.id})">Изменить</button>${device.hotel_id ? `<button class="btn small danger" onclick="unpairDevice(${device.id})">Отвязать</button>` : ''}</div></td>
+      </tr>`).join('') : '<tr><td colspan="5"><div class="empty"><div><strong>Телевизоров пока нет</strong>После запуска заставки устройство появится здесь.</div></div></td></tr>';
+    }
+
+    function renderCounts() {
+      $('#nav-hotels').textContent = state.hotels.length; $('#nav-stations').textContent = state.stations.length; $('#nav-devices').textContent = state.devices.length;
+    }
+    function renderAll() { renderOverview(); renderHotels(); renderStations(); renderDevices(); renderCounts(); }
+
+    async function loadAll(silent = false) {
+      document.body.classList.add('loading');
+      try {
+        const [overview, hotels, stations, devices] = await Promise.all([
+          api('/api/admin/overview'), api('/api/admin/hotels'), api('/api/admin/stations'), api('/api/admin/devices')
+        ]);
+        state.overview = overview; state.hotels = hotels.hotels; state.stations = stations.stations; state.devices = devices.devices;
+        renderAll(); $('#sync-text').textContent = `Обновлено ${new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}`;
+        if (!silent) notify('Данные обновлены');
+      } catch (error) { notify(error.message, true); }
+      finally { document.body.classList.remove('loading'); }
+    }
+
+    const modal = $('#modal');
+    function showModal(title, fields, submitText, onSubmit) {
+      state.modal = onSubmit; $('#modal-title').textContent = title; $('#modal-fields').innerHTML = fields; $('#modal-submit').textContent = submitText || 'Сохранить'; modal.showModal();
+    }
+    function closeModal() { modal.close(); state.modal = null; }
+    function field(name, label, value = '', options = {}) {
+      const full = options.full === false ? '' : ' full';
+      if (options.type === 'textarea') return `<div class="field${full}"><label for="${name}">${label}</label><textarea id="${name}" name="${name}" ${options.required ? 'required' : ''}>${escapeHtml(value)}</textarea>${options.hint ? `<div class="field-hint">${options.hint}</div>` : ''}</div>`;
+      return `<div class="field${full}"><label for="${name}">${label}</label><input id="${name}" name="${name}" type="${options.type || 'text'}" value="${escapeHtml(value)}" ${options.required ? 'required' : ''} ${options.placeholder ? `placeholder="${escapeHtml(options.placeholder)}"` : ''}>${options.hint ? `<div class="field-hint">${options.hint}</div>` : ''}</div>`;
+    }
+    function switchField(name, title, note, checked) { return `<div class="field full"><div class="switch-row"><div><strong>${title}</strong><span>${note}</span></div><label class="switch"><input id="${name}" name="${name}" type="checkbox" ${checked ? 'checked' : ''}><span class="switch-ui"></span></label></div></div>`; }
+
+    function openHotel(id = null) {
+      const hotel = state.hotels.find(h => h.id === id);
+      const stationOptions = ['<option value="">Не выбрана</option>', ...state.stations.filter(s => s.is_active).map(s => `<option value="${s.id}" ${hotel?.station?.id === s.id ? 'selected' : ''}>${escapeHtml(s.title)}</option>`)].join('');
+      showModal(hotel ? 'Настройки отеля' : 'Новый отель', `<div class="form-grid">
+        ${field('name', 'Название', hotel?.name, {required:true, full:false})}${field('slug', 'Slug для ссылки', hotel?.slug, {required:true, full:false, placeholder:'plaza'})}
+        ${field('address', 'Адрес на двух языках', hotel?.address, {type:'textarea', hint:'Русский и английский адрес можно разделить переносом строки.'})}
+        ${field('assets_path', 'Папка с медиа', hotel?.assets_path || '', {placeholder: hotel ? '' : 'hotels/plaza', hint:'Если оставить пустой, будет создан путь hotels/slug.'})}
+        <div class="field full"><label for="station_id">Радиостанция</label><select id="station_id" name="station_id">${stationOptions}</select></div>
+        ${switchField('is_active', 'Отель активен', 'Экран получает заставку и музыку', hotel?.is_active ?? true)}
+      </div>`, hotel ? 'Сохранить' : 'Добавить отель', async form => {
+        const payload = {name: form.name.value, slug: form.slug.value, address: form.address.value, assets_path: form.assets_path.value || null, is_active: form.is_active.checked};
+        const result = await api(hotel ? `/api/admin/hotels/${hotel.id}` : '/api/admin/hotels', {method: hotel ? 'PATCH' : 'POST', body: JSON.stringify(payload)});
+        const hotelId = hotel?.id || result.hotel.id; const stationId = form.station_id.value;
+        if (stationId) await api(`/api/dashboard/hotel/${hotelId}/station/${stationId}`, {method:'POST'});
+        closeModal(); await loadAll(true); notify(hotel ? 'Настройки отеля сохранены' : 'Отель добавлен');
+      });
+    }
+
+    function openStation(id = null) {
+      const station = state.stations.find(s => s.id === id);
+      showModal(station ? 'Изменить станцию' : 'Новая радиостанция', `<div class="form-grid">
+        ${field('title', 'Название', station?.title, {required:true, full:false})}${field('status', 'Подпись эфира', station?.status, {full:false, placeholder:'Прямой эфир · Lounge'})}
+        ${field('stream_url', 'Ссылка на аудиопоток', station?.stream_url, {type:'url', required:true, hint:'Прямая ссылка на поток, которую сможет воспроизвести браузер телевизора.'})}
+        ${switchField('is_active', 'Станция активна', 'Её можно выбирать для отелей', station?.is_active ?? true)}
+      </div>`, station ? 'Сохранить' : 'Добавить станцию', async form => {
+        const payload = {title: form.title.value, status: form.status.value, stream_url: form.stream_url.value, is_active: form.is_active.checked};
+        await api(station ? `/api/admin/stations/${station.id}` : '/api/admin/stations', {method: station ? 'PATCH' : 'POST', body:JSON.stringify(payload)});
+        closeModal(); await loadAll(true); notify(station ? 'Станция обновлена' : 'Станция добавлена');
+      });
+    }
+
+    function openDevice(id) {
+      const device = state.devices.find(d => d.id === id); if (!device) return;
+      const options = ['<option value="">Не привязан</option>', ...state.hotels.map(h => `<option value="${h.id}" ${device.hotel_id === h.id ? 'selected' : ''}>${escapeHtml(h.name)}</option>`)].join('');
+      showModal('Настройки телевизора', `<div class="form-grid">${field('name', 'Название экрана', device.name, {required:true})}<div class="field full"><label for="hotel_id">Отель</label><select id="hotel_id" name="hotel_id">${options}</select><div class="field-hint">Обычно отель назначается автоматически после отправки кода боту.</div></div><div class="field full"><label>ID устройства</label><input value="${escapeHtml(device.device_uid)}" disabled></div></div>`, 'Сохранить', async form => {
+        await api(`/api/admin/devices/${device.id}`, {method:'PATCH', body:JSON.stringify({name:form.name.value, hotel_id:form.hotel_id.value ? Number(form.hotel_id.value) : null})});
+        closeModal(); await loadAll(true); notify('Телевизор обновлён');
+      });
+    }
+
+    function showPairHelp() {
+      showModal('Как подключить телевизор', `<div style="color:var(--muted);font-size:13px;line-height:1.7"><p><strong style="color:var(--ink)">1.</strong> Откройте заставку HoReMi на телевизоре.</p><p><strong style="color:var(--ink)">2.</strong> На экране появится одноразовый шестизначный код.</p><p><strong style="color:var(--ink)">3.</strong> Отправьте этот код Telegram-боту от аккаунта, привязанного к отелю.</p><p><strong style="color:var(--ink)">4.</strong> Телевизор обновится автоматически и загрузит заставку нужного отеля.</p></div>`, 'Понятно', async () => closeModal());
+    }
+    async function unpairDevice(id) {
+      if (!confirm('Отвязать телевизор от отеля? На экране снова появится код подключения.')) return;
+      try { await api(`/api/admin/devices/${id}`, {method:'PATCH', body:JSON.stringify({hotel_id:null})}); await loadAll(true); notify('Телевизор отвязан'); } catch (error) { notify(error.message, true); }
+    }
+    async function removeStation(id) {
+      const station = state.stations.find(s => s.id === id); if (!station || !confirm(`Удалить станцию «${station.title}»?`)) return;
+      try { await api(`/api/admin/stations/${id}`, {method:'DELETE'}); await loadAll(true); notify('Станция удалена'); } catch (error) { notify(error.message, true); }
+    }
+
+    $$('.nav-btn').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
+    $$('[data-go]').forEach(button => button.addEventListener('click', () => showView(button.dataset.go)));
+    $$('[data-action]').forEach(button => button.addEventListener('click', () => button.dataset.action === 'add-station' ? openStation() : openHotel()));
+    $('#context-action').addEventListener('click', event => { const action = event.currentTarget.dataset.action; action === 'add-station' ? openStation() : action === 'pair-help' ? showPairHelp() : openHotel(); });
+    $('#refresh-btn').addEventListener('click', () => loadAll());
+    $('#hotel-search').addEventListener('input', renderHotels); $('#station-search').addEventListener('input', renderStations); $('#device-search').addEventListener('input', renderDevices);
+    $('#modal-close').addEventListener('click', closeModal); $('#modal-cancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
+    $('#modal-form').addEventListener('submit', async event => { event.preventDefault(); if (!state.modal) return; const submit = $('#modal-submit'); submit.disabled = true; try { await state.modal(event.currentTarget); } catch (error) { notify(error.message, true); } finally { submit.disabled = false; } });
+    $('#menu-btn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+
+    const initialView = location.hash.slice(1); showView(titles[initialView] ? initialView : 'overview'); loadAll(true);
+    setInterval(() => loadAll(true), 30000);
+  </script>
+</body>
+</html>

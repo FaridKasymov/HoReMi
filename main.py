@@ -1,12 +1,10 @@
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqladmin import Admin
-from db.database import engine
-from admin import HotelAdmin, StationAdmin, UserAdmin, ScreenSessionAdmin, CustomBlockAdmin
 
-from db.database import init_db
+from db.database import init_db, seed_default_stations
 from api.endpoints import router as api_router
 
 @asynccontextmanager
@@ -14,6 +12,7 @@ async def lifespan(app: FastAPI):
     # Этот код выполняется один раз при запуске сервера
     print("Инициализация базы данных...")
     await init_db()
+    await seed_default_stations()
     
     # Создаем папку public, если ее нет (чтобы сервер не упал с ошибкой)
     if not os.path.exists("public"):
@@ -28,12 +27,13 @@ app = FastAPI(title="Hotel Audio SaaS", lifespan=lifespan)
 # Подключаем наши маршруты (эндпоинты)
 app.include_router(api_router)
 
+@app.get("/admin", include_in_schema=False)
+async def admin_panel():
+    return FileResponse("public/admin.html")
+
+@app.get("/dashboard", include_in_schema=False)
+async def legacy_dashboard_redirect():
+    return RedirectResponse("/admin", status_code=307)
+
 # Разрешаем скачивать картинки и видео по ссылке /public/...
 app.mount("/public", StaticFiles(directory="public"), name="public")
-# Подключаем веб-админку
-admin = Admin(app, engine)
-admin.add_view(HotelAdmin)
-admin.add_view(StationAdmin)
-admin.add_view(UserAdmin)
-admin.add_view(ScreenSessionAdmin)
-admin.add_view(CustomBlockAdmin)

@@ -30,6 +30,7 @@ class Station(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(100))             # Например, "🎷 Джаз"
     stream_url: Mapped[str] = mapped_column(String(500))        # Ссылка на поток
+    status: Mapped[str | None] = mapped_column(String(120), nullable=True)  # Подпись жанра/эфира
     is_active: Mapped[bool] = mapped_column(default=True)
 
 class HotelState(Base):
