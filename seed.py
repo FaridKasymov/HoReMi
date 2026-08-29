@@ -39,7 +39,7 @@ async def seed_data():
                 name="Kaznacheyskiy Hotel", 
                 slug="plaza", 
                 assets_path="hotels/plaza",
-                address="ул. Большой Златоустинский переулок, 7с1 • 71 Big Zlatoustinsky Lane",
+                address="ул. Большой Златоустинский переулок, 7с1 • 7s1 Big Zlatoustinsky Lane",
                 is_active=True
             )
             db.add(plaza)
