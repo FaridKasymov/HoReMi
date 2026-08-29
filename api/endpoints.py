@@ -1,10 +1,15 @@
+import secrets
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from db.database import AsyncSessionLocal
-from db.models import Hotel, HotelState, Station
+from db.models import Device, Hotel, HotelState, PairingCode, Station
 
 router = APIRouter()
 
@@ -13,15 +18,123 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
+class RegisterDeviceRequest(BaseModel):
+    device_uid: str | None = None
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+async def get_or_create_pairing_code(device: Device, db: AsyncSession) -> PairingCode:
+    now = utc_now()
+    result = await db.execute(
+        select(PairingCode)
+        .where(
+            PairingCode.device_id == device.id,
+            PairingCode.used_at.is_(None),
+            PairingCode.expires_at > now,
+        )
+        .order_by(PairingCode.created_at.desc())
+    )
+    pairing_code = result.scalars().first()
+    if pairing_code:
+        return pairing_code
+
+    for _ in range(20):
+        code = str(secrets.randbelow(900000) + 100000)
+        existing = await db.execute(select(PairingCode.id).where(PairingCode.code == code))
+        if existing.scalar_one_or_none() is None:
+            pairing_code = PairingCode(
+                code=code,
+                device_id=device.id,
+                expires_at=now + timedelta(minutes=10),
+            )
+            db.add(pairing_code)
+            await db.flush()
+            return pairing_code
+
+    raise HTTPException(status_code=503, detail="Не удалось создать код привязки")
+
+@router.post("/api/tv/register")
+async def register_tv(payload: RegisterDeviceRequest, db: AsyncSession = Depends(get_db)):
+    device_uid = payload.device_uid or uuid4().hex
+    result = await db.execute(select(Device).where(Device.device_uid == device_uid))
+    device = result.scalar_one_or_none()
+
+    if not device:
+        device = Device(device_uid=device_uid)
+        db.add(device)
+        await db.flush()
+
+    device.last_seen = utc_now()
+
+    if device.hotel_id:
+        hotel_result = await db.execute(select(Hotel).where(Hotel.id == device.hotel_id))
+        hotel = hotel_result.scalar_one_or_none()
+        await db.commit()
+        return {
+            "status": "paired",
+            "device_uid": device.device_uid,
+            "hotel": {"name": hotel.name, "slug": hotel.slug} if hotel else None,
+        }
+
+    pairing_code = await get_or_create_pairing_code(device, db)
+    await db.commit()
+    return {
+        "status": "waiting",
+        "device_uid": device.device_uid,
+        "code": pairing_code.code,
+        "expires_at": pairing_code.expires_at.isoformat(),
+    }
+
+@router.get("/api/tv/status")
+async def get_tv_status(device_uid: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Device).where(Device.device_uid == device_uid))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="Устройство не найдено")
+
+    device.last_seen = utc_now()
+
+    if device.hotel_id:
+        hotel_result = await db.execute(select(Hotel).where(Hotel.id == device.hotel_id))
+        hotel = hotel_result.scalar_one_or_none()
+        await db.commit()
+        return {
+            "status": "paired",
+            "hotel": {"name": hotel.name, "slug": hotel.slug} if hotel else None,
+        }
+
+    pairing_code = await get_or_create_pairing_code(device, db)
+    await db.commit()
+    return {
+        "status": "waiting",
+        "code": pairing_code.code,
+        "expires_at": pairing_code.expires_at.isoformat(),
+    }
+
 @router.get("/api/display")
-async def get_display_data(hotel: str, db: AsyncSession = Depends(get_db)):
+async def get_display_data(
+    hotel: str | None = None,
+    device_uid: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
     """
     Этот эндпоинт опрашивают телевизоры. 
     Пример запроса: GET /api/display?hotel=plaza
     """
     
-    # 1. Ищем отель по slug (например, 'plaza')
-    result = await db.execute(select(Hotel).where(Hotel.slug == hotel))
+    if device_uid:
+        device_result = await db.execute(select(Device).where(Device.device_uid == device_uid))
+        device = device_result.scalar_one_or_none()
+        if not device or not device.hotel_id:
+            raise HTTPException(status_code=403, detail="Телевизор не привязан к отелю")
+        result = await db.execute(select(Hotel).where(Hotel.id == device.hotel_id))
+    elif hotel:
+        # Старый режим оставлен для совместимости со ссылками вида ?hotel=plaza.
+        result = await db.execute(select(Hotel).where(Hotel.slug == hotel))
+    else:
+        raise HTTPException(status_code=400, detail="Не указан телевизор или отель")
+
     hotel_obj = result.scalar_one_or_none()
 
     if not hotel_obj:

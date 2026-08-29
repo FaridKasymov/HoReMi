@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build: .
@@ -11,4 +9,16 @@ services:
     volumes:
       - ./db:/app/db
       - ./public:/app/public
+    restart: unless-stopped
+
+  bot:
+    build: .
+    container_name: hotel_audio_bot
+    command: python bot.py
+    env_file:
+      - .env
+    volumes:
+      - ./db:/app/db
+    depends_on:
+      - web
     restart: unless-stopped

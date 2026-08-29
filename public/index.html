@@ -1,299 +1,93 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Лобби Плеер / Lobby Player</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400&display=swap');
-
-        body { 
-            margin: 0; 
-            color: white; 
-            font-family: 'Montserrat', sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            overflow: hidden;
-            transition: background-image 2s ease-in-out;
-            background-size: cover;
-            background-position: center;
-            background-color: #111; 
-        }
-        
-        #bg-overlay {
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5); 
-            z-index: -1;
-        }
-
-        #overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.95); display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; flex-direction: column;}
-        .hidden { display: none !important; }
-        
-        /* Верхний бар (погода и часы) */
-        #top-bar {
-            position: absolute;
-            top: 40px;
-            right: 50px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .widget-pill {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 12px 24px;
-            border-radius: 40px;
-            font-size: 22px;
-            font-weight: 200;
-            letter-spacing: 2px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        /* Адрес в правом нижнем углу */
-        #hotel-address {
-            position: absolute;
-            bottom: 40px;
-            right: 50px;
-            font-size: 18px;
-        }
-
-        /* Анимация логотипа */
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-15px); }
-            100% { transform: translateY(0px); }
-        }
-
-        #hotel-logo { 
-            max-width: 300px; 
-            max-height: 200px; 
-            margin-bottom: 30px; 
-            display: none; 
-            animation: float 6s ease-in-out infinite; 
-        }
-        
-        #hotel-name { 
-            font-size: 56px; 
-            margin-bottom: 10px; 
-            font-weight: 200; 
-            letter-spacing: 10px; 
-            text-align: center; 
-            text-transform: uppercase;
-        }
-
-        /* Плеер в левом нижнем углу */
-        #radio-widget {
-            position: absolute;
-            bottom: 40px;
-            left: 50px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            opacity: 0.7;
-        }
-        
-        /* Анимация минималистичного эквалайзера */
-        .equalizer {
-            display: flex;
-            align-items: flex-end;
-            gap: 4px;
-            height: 20px;
-        }
-        .eq-bar {
-            width: 2px;
-            background-color: white;
-            animation: eq 1s ease-in-out infinite alternate;
-        }
-        .eq-bar:nth-child(1) { height: 10px; animation-delay: 0.0s; }
-        .eq-bar:nth-child(2) { height: 20px; animation-delay: 0.2s; }
-        .eq-bar:nth-child(3) { height: 12px; animation-delay: 0.4s; }
-        .eq-bar:nth-child(4) { height: 16px; animation-delay: 0.1s; }
-
-        @keyframes eq {
-            0% { height: 4px; }
-            100% { height: 20px; }
-        }
-
-        #station-name { 
-            font-size: 20px; 
-            font-weight: 300; 
-            letter-spacing: 4px; 
-            text-transform: uppercase;
-        }
-        
-        .pulse { animation: pulse-animation 2s infinite; font-weight: 200; letter-spacing: 2px;}
-        @keyframes pulse-animation {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HoReMi Hotel Display</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Manrope:wght@300;400;500&display=swap');
+*{box-sizing:border-box} :root{--ivory:#f4f0e8;--muted:rgba(244,240,232,.62);--line:rgba(244,240,232,.2);--accent:#d7b98c}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#090a09} body{color:var(--ivory);font-family:Manrope,sans-serif}
+.background-stage,.background-layer,.scrim,.grain{position:absolute;inset:0}.background-stage{z-index:0;overflow:hidden;background:#11130f}
+.background-layer{background:center/cover;opacity:0;transform:scale(1);transition:opacity 2.4s ease,transform 14s ease-out}
+.background-layer.active{opacity:1;transform:scale(1.065)}
+.scrim{background:linear-gradient(90deg,rgba(7,9,7,.9),rgba(7,9,7,.5) 43%,rgba(7,9,7,.16) 76%,rgba(7,9,7,.4)),linear-gradient(0deg,rgba(7,9,7,.92),transparent 44%)}
+.grain{opacity:.08;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E")}
+.hotel-scene{position:relative;z-index:2;display:grid;grid-template-rows:auto 1fr auto;width:100%;height:100%;padding:clamp(28px,4vw,68px)}
+.scene-header{display:flex;align-items:flex-start;justify-content:space-between}
+.signature{display:flex;align-items:center;gap:14px;color:var(--muted);font-size:clamp(10px,.75vw,14px);font-weight:500;letter-spacing:.32em;text-transform:uppercase}
+.signature:before{width:38px;height:1px;content:"";background:var(--accent)}
+.now-playing{display:flex;align-items:center;gap:16px;text-align:right}.now-copy{display:grid;gap:3px}
+.micro,.info-label{color:var(--muted);font-size:clamp(8px,.65vw,12px);font-weight:500;letter-spacing:.23em;text-transform:uppercase}
+#station-name{font-family:"Cormorant Garamond",serif;font-size:clamp(20px,1.65vw,32px);font-weight:300}
+.equalizer{display:flex;align-items:center;justify-content:center;gap:3px;width:36px;height:36px;border:1px solid var(--line);border-radius:50%}
+.eq{width:2px;height:5px;background:var(--accent);animation:eq 1.1s ease-in-out infinite alternate}.eq:nth-child(2){animation-delay:.25s}.eq:nth-child(3){animation-delay:.5s}
+@keyframes eq{to{height:15px}}
+.brand-stage{display:flex;align-items:center;padding-bottom:clamp(45px,7vh,110px)}
+.brand-lockup{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:clamp(28px,3.5vw,68px);max-width:min(1080px,82vw)}
+.logo-orbit{position:relative;display:grid;place-items:center;width:clamp(150px,17vw,310px);aspect-ratio:1}
+.logo-orbit:before,.logo-orbit:after{position:absolute;border-radius:50%;content:""}.logo-orbit:before{inset:0;border:1px solid var(--line);animation:orbit 7s ease-in-out infinite}
+.logo-orbit:after{inset:12%;background:radial-gradient(circle,rgba(244,240,232,.16),transparent 70%);filter:blur(8px)}
+#hotel-logo{position:relative;z-index:1;display:none;max-width:70%;max-height:70%;object-fit:contain;filter:drop-shadow(0 18px 38px rgba(0,0,0,.32));animation:drift 6s ease-in-out infinite}
+@keyframes orbit{0%,100%{transform:scale(.96);opacity:.5}50%{transform:scale(1.03);opacity:1}} @keyframes drift{50%{transform:translateY(-10px) rotate(.5deg)}}
+.welcome{display:flex;align-items:center;gap:16px;margin-bottom:18px;color:var(--accent);font-size:clamp(10px,.75vw,14px);font-weight:500;letter-spacing:.28em;text-transform:uppercase}
+.welcome:after{width:clamp(40px,6vw,110px);height:1px;content:"";background:var(--accent);opacity:.65}
+#hotel-name{max-width:780px;font-family:"Cormorant Garamond",serif;font-size:clamp(54px,6.6vw,126px);font-weight:300;line-height:.86;letter-spacing:-.025em;text-wrap:balance}
+.info-dock{display:grid;grid-template-columns:minmax(160px,.8fr) minmax(240px,1.15fr) minmax(400px,2fr);border-block:1px solid var(--line);background:rgba(15,17,15,.46);backdrop-filter:blur(22px) saturate(125%)}
+.info-block{min-width:0;padding:clamp(18px,2vw,34px) clamp(20px,2.5vw,46px)}.info-block+.info-block{border-left:1px solid var(--line)}.info-label{margin-bottom:10px}
+#clock-widget,#weather-temperature{font-family:"Cormorant Garamond",serif;font-size:clamp(34px,3.3vw,62px);font-weight:300;line-height:.95}
+#clock-date,.condition{margin-top:6px;color:var(--muted);font-size:clamp(10px,.76vw,14px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weather-main{display:flex;align-items:baseline;gap:20px}.weather-copy{display:grid;gap:2px;min-width:0}.condition.ru{color:var(--ivory)}
+.address-lines{display:grid;gap:8px;padding-top:2px}.address{font-size:clamp(14px,1.15vw,22px);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.address.en{color:var(--muted);font-size:clamp(11px,.86vw,16px)}
+#overlay{position:absolute;inset:0;z-index:15;display:flex;align-items:flex-end;justify-content:center;padding-bottom:clamp(30px,4vh,60px);cursor:pointer;background:rgba(5,6,5,.12)}
+.start-prompt{display:flex;align-items:center;gap:15px;padding:12px 20px;border:1px solid var(--line);background:rgba(8,9,8,.62);backdrop-filter:blur(16px);font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase}
+.start-key{display:grid;place-items:center;min-width:38px;height:26px;border:1px solid rgba(244,240,232,.4);color:var(--accent);font-size:9px}
+#pairing-screen{position:absolute;inset:0;z-index:30;display:grid;grid-template-columns:minmax(320px,.8fr) minmax(520px,1.2fr);background:#0b0d0b}
+.pairing-visual{position:relative;background:linear-gradient(145deg,rgba(9,11,9,.18),rgba(9,11,9,.82)),url('/public/hotels/plaza/1.jpg') center/cover}.pairing-visual:after{position:absolute;inset:9%;border:1px solid var(--line);content:""}
+.pairing-brand{position:absolute;bottom:10%;left:12%;font-family:"Cormorant Garamond",serif;font-size:clamp(36px,4.5vw,84px);font-weight:300;line-height:.92}
+.pairing-content{display:flex;flex-direction:column;justify-content:center;padding:clamp(50px,8vw,150px)}.pairing-kicker{margin-bottom:26px;color:var(--accent);font-size:11px;letter-spacing:.26em;text-transform:uppercase}
+.pairing-title{margin:0 0 18px;font-family:"Cormorant Garamond",serif;font-size:clamp(44px,5vw,92px);font-weight:300;line-height:.93}.pairing-instruction{margin:0;color:var(--muted);font-size:clamp(15px,1.1vw,21px);line-height:1.6}
+#pairing-code{margin:clamp(34px,5vh,70px) 0 24px;font-family:"Cormorant Garamond",serif;font-size:clamp(72px,8vw,150px);font-weight:300;line-height:.8;letter-spacing:.12em;font-variant-numeric:tabular-nums}
+#pairing-status{color:var(--muted);font-size:13px;letter-spacing:.08em}.hidden{display:none!important}
+@media(max-width:900px){.hotel-scene{padding:28px}.brand-lockup{max-width:92vw}.info-dock{grid-template-columns:.75fr 1fr 1.7fr}.info-block{padding:16px 18px}#pairing-screen{grid-template-columns:1fr}.pairing-visual{display:none}}
+</style>
 </head>
 <body>
-    <div id="bg-overlay"></div>
-    
-    <div id="overlay">
-        <h1 class="pulse">PRESS OK</h1>
-    </div>
-
-    <!-- Верхний бар (погода и часы) -->
-    <div id="top-bar">
-        <div class="widget-pill" id="weather-widget">--°C</div>
-        <div class="widget-pill" id="clock-widget">--:--</div>
-    </div>
-    
-    <img id="hotel-logo" alt="Логотип отеля">
-    <div id="hotel-name"></div>
-    
-    <!-- Радио плеер в левом нижнем углу -->
-    <div id="radio-widget">
-        <div class="equalizer">
-            <div class="eq-bar"></div>
-            <div class="eq-bar"></div>
-            <div class="eq-bar"></div>
-            <div class="eq-bar"></div>
-        </div>
-        <div id="station-name">ПОДКЛЮЧЕНИЕ...</div>
-    </div>
-
-    <!-- Адрес в правом нижнем углу -->
-    <div class="widget-pill" id="hotel-address">--</div>
-    
-    <audio id="player"></audio>
-
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const hotelSlug = urlParams.get('hotel') || 'plaza'; 
-        
-        const player = document.getElementById('player');
-        const overlay = document.getElementById('overlay');
-        const hotelNameTitle = document.getElementById('hotel-name');
-        const stationNameTitle = document.getElementById('station-name');
-        const hotelLogo = document.getElementById('hotel-logo');
-        const hotelAddressEl = document.getElementById('hotel-address');
-        
-        let currentStationUrl = "";
-        
-        const bgImages = ['1.jpg', '2.jpg', '3.jpg'];
-        let currentBgIndex = 0;
-        let isSlideshowRunning = false;
-
-        function updateClock() {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            document.getElementById('clock-widget').innerText = `${hours}:${minutes}`;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        function getWeatherDescription(code) {
-            const weatherMap = {
-                0: "Clear / Ясно",
-                1: "Mainly clear / Малооблачно",
-                2: "Partly cloudy / Переменная облачность",
-                3: "Overcast / Пасмурно",
-                45: "Fog / Туман",
-                48: "Rime fog / Туман с изморозью",
-                51: "Light drizzle / Морось",
-                53: "Drizzle / Морось",
-                55: "Dense drizzle / Плотная морось",
-                61: "Slight rain / Небольшой дождь",
-                63: "Rain / Дождь",
-                65: "Heavy rain / Сильный дождь",
-                71: "Slight snow / Небольшой снег",
-                73: "Snow / Снег",
-                75: "Heavy snow / Сильный снег",
-                80: "Rainfall / Дождь",
-                85: "Snowfall / Снегопад",
-                95: "Thunderstorm / Гроза",
-                99: "Hail / Град"
-            };
-            return weatherMap[code] || "Cloudy / Облачно";
-        }
-
-        async function fetchWeather() {
-            try {
-                const response = await fetch('/api/weather/v1/forecast');
-                const result = await response.json();
-                if (result.status === 'ok') {
-                    const temp = Math.round(result.data.current_weather.temperature);
-                    const code = result.data.current_weather.weathercode;
-                    
-                    const conditionText = getWeatherDescription(code);
-                    const sign = temp > 0 ? '+' : '';
-                    
-                    document.getElementById('weather-widget').innerText = `${sign}${temp}°C  •  ${conditionText}`;
-                }
-            } catch (e) {
-                console.error("Ошибка API погоды", e);
-            }
-        }
-        
-        overlay.addEventListener('click', () => {
-            overlay.classList.add('hidden');
-            player.play().catch(e => console.log("Ожидание трека...")); 
-            
-            fetchData(); 
-            setInterval(fetchData, 5000); 
-            
-            fetchWeather();
-            setInterval(fetchWeather, 1800000); 
-        });
-
-        async function fetchData() {
-            try {
-                const response = await fetch(`/api/display?hotel=${hotelSlug}`);
-                const data = await response.json();
-
-                if (data.status === 'ok') {
-                    hotelNameTitle.innerText = data.hotel.name;
-                    stationNameTitle.innerText = data.station.title; 
-                    hotelAddressEl.innerText = data.hotel.address || "";
-
-                    const assetsPath = data.hotel.assets_path;
-                    
-                    hotelLogo.src = `/public/${assetsPath}/logo.png`;
-                    hotelLogo.style.display = "block"; 
-
-                    if (!isSlideshowRunning) {
-                        isSlideshowRunning = true;
-                        document.body.style.backgroundImage = `url('/public/${assetsPath}/${bgImages[0]}')`;
-                        
-                        setInterval(() => {
-                            currentBgIndex = (currentBgIndex + 1) % bgImages.length;
-                            const nextImageUrl = `/public/${assetsPath}/${bgImages[currentBgIndex]}`;
-                            
-                            const img = new Image();
-                            img.src = nextImageUrl;
-                            img.onload = () => {
-                                document.body.style.backgroundImage = `url('${nextImageUrl}')`;
-                            };
-                        }, 10000); 
-                    }
-
-                    if (data.station.url !== currentStationUrl && data.station.url !== "") {
-                        currentStationUrl = data.station.url;
-                        player.src = currentStationUrl;
-                        player.play();
-                    }
-                } else {
-                    stationNameTitle.innerText = data.message || "Ошибка API";
-                }
-            } catch (error) {
-                console.error("Ошибка связи с сервером", error);
-            }
-        }
-    </script>
+<div class="background-stage"><div class="background-layer" id="bg-a"></div><div class="background-layer" id="bg-b"></div><div class="scrim"></div><div class="grain"></div></div>
+<main class="hotel-scene">
+  <header class="scene-header">
+    <div class="signature">HoReMi · Hotel atmosphere</div>
+    <div class="now-playing"><div class="now-copy"><span class="micro">Now playing / Сейчас играет</span><span id="station-name">Подключение...</span></div><div class="equalizer"><i class="eq"></i><i class="eq"></i><i class="eq"></i></div></div>
+  </header>
+  <section class="brand-stage"><div class="brand-lockup"><div class="logo-orbit"><img id="hotel-logo" alt="Логотип отеля"></div><div><div class="welcome">Welcome · Добро пожаловать</div><div id="hotel-name">Hotel</div></div></div></section>
+  <footer class="info-dock">
+    <section class="info-block"><div class="info-label">Local time / Местное время</div><div id="clock-widget">--:--</div><div id="clock-date">—</div></section>
+    <section class="info-block"><div class="info-label">Weather / Погода</div><div class="weather-main"><div id="weather-temperature">--°</div><div class="weather-copy"><div class="condition ru" id="weather-ru">Загрузка</div><div class="condition" id="weather-en">Loading</div></div></div></section>
+    <section class="info-block"><div class="info-label">Address / Адрес</div><div class="address-lines"><div class="address ru" id="address-ru">—</div><div class="address en" id="address-en">—</div></div></section>
+  </footer>
+</main>
+<div id="overlay"><div class="start-prompt"><span class="start-key">OK</span><span>Start sound / Включить звук</span></div></div>
+<div id="pairing-screen"><div class="pairing-visual"><div class="pairing-brand">Hotel<br>display</div></div><div class="pairing-content"><div class="pairing-kicker">HoReMi · Secure pairing</div><h1 class="pairing-title">Подключение<br>телевизора</h1><p class="pairing-instruction">Отправьте код Telegram-боту отеля.<br>Send this code to the hotel Telegram bot.</p><div id="pairing-code">------</div><div id="pairing-status">Получаем код · Getting pairing code...</div></div></div>
+<audio id="player"></audio>
+<script>
+const params=new URLSearchParams(location.search),legacyHotelSlug=params.get('hotel');
+const player=document.getElementById('player'),overlay=document.getElementById('overlay'),pairingScreen=document.getElementById('pairing-screen'),pairingCode=document.getElementById('pairing-code'),pairingStatus=document.getElementById('pairing-status'),hotelName=document.getElementById('hotel-name'),stationName=document.getElementById('station-name'),hotelLogo=document.getElementById('hotel-logo'),addressRu=document.getElementById('address-ru'),addressEn=document.getElementById('address-en'),layers=[document.getElementById('bg-a'),document.getElementById('bg-b')];
+const bgImages=['1.jpg','2.jpg','3.jpg'];
+let deviceUid=localStorage.getItem('horemi_device_uid'),currentStationUrl='',assetsPath='',bgIndex=0,activeLayer=0,slideTimer=null,pairTimer=null,dataTimer=null,weatherTimer=null;
+const weather={0:['Ясно','Clear'],1:['Малооблачно','Mainly clear'],2:['Переменная облачность','Partly cloudy'],3:['Пасмурно','Overcast'],45:['Туман','Fog'],48:['Туман с изморозью','Rime fog'],51:['Лёгкая морось','Light drizzle'],53:['Морось','Drizzle'],55:['Сильная морось','Dense drizzle'],61:['Небольшой дождь','Slight rain'],63:['Дождь','Rain'],65:['Сильный дождь','Heavy rain'],71:['Небольшой снег','Slight snow'],73:['Снег','Snow'],75:['Сильный снег','Heavy snow'],80:['Ливень','Rain showers'],85:['Снегопад','Snow showers'],95:['Гроза','Thunderstorm'],99:['Гроза с градом','Thunderstorm with hail']};
+function updateClock(){const now=new Date();document.getElementById('clock-widget').innerText=new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit'}).format(now);const ru=new Intl.DateTimeFormat('ru-RU',{weekday:'short',day:'numeric',month:'short'}).format(now),en=new Intl.DateTimeFormat('en-GB',{weekday:'short',day:'numeric',month:'short'}).format(now);document.getElementById('clock-date').innerText=ru+' · '+en}
+async function fetchWeather(){try{const r=await fetch('/api/weather/v1/forecast'),v=await r.json();if(v.status!=='ok')return;const t=Math.round(v.data.current_weather.temperature),d=weather[v.data.current_weather.weathercode]||['Облачно','Cloudy'];document.getElementById('weather-temperature').innerText=(t>0?'+':'')+t+'°';document.getElementById('weather-ru').innerText=d[0];document.getElementById('weather-en').innerText=d[1]}catch(e){console.error('Ошибка погоды',e)}}
+function splitAddress(value){const p=(value||'').split('•').map(x=>x.trim()).filter(Boolean);addressRu.innerText=p[0]||'Адрес не указан';addressEn.innerText=p.slice(1).join(' · ')||'Address not specified'}
+function setBackground(index,immediate=false){if(!assetsPath)return;const next=immediate?activeLayer:1-activeLayer,url='/public/'+assetsPath+'/'+bgImages[index],image=new Image();image.onload=()=>{layers[next].style.backgroundImage="url('"+url+"')";if(immediate){layers[next].classList.add('active');return}layers[activeLayer].classList.remove('active');layers[next].classList.add('active');activeLayer=next};image.src=url}
+function startSlideshow(path){if(assetsPath===path&&slideTimer)return;assetsPath=path;bgIndex=0;setBackground(0,true);if(slideTimer)clearInterval(slideTimer);slideTimer=setInterval(()=>{bgIndex=(bgIndex+1)%bgImages.length;setBackground(bgIndex)},12000)}
+async function fetchData(){if(!legacyHotelSlug&&!deviceUid)return;try{const q=legacyHotelSlug?'hotel='+encodeURIComponent(legacyHotelSlug):'device_uid='+encodeURIComponent(deviceUid),r=await fetch('/api/display?'+q),d=await r.json();if(d.status!=='ok'){stationName.innerText=d.message||'Ошибка подключения';return}hotelName.innerText=d.hotel.name;stationName.innerText=d.station.title;splitAddress(d.hotel.address);hotelLogo.src='/public/'+d.hotel.assets_path+'/logo.png';hotelLogo.style.display='block';startSlideshow(d.hotel.assets_path);if(d.station.url&&d.station.url!==currentStationUrl){currentStationUrl=d.station.url;player.src=currentStationUrl}}catch(e){console.error('Ошибка сервера',e)}}
+function enterFullscreen(){const root=document.documentElement;if(document.fullscreenElement)return;if(root.requestFullscreen)root.requestFullscreen().catch(()=>{});else if(root.webkitRequestFullscreen)root.webkitRequestFullscreen()}
+function activate(){enterFullscreen();overlay.classList.add('hidden');player.play().catch(()=>{});fetchData();fetchWeather();if(!dataTimer)dataTimer=setInterval(fetchData,5000);if(!weatherTimer)weatherTimer=setInterval(fetchWeather,1800000)}
+overlay.addEventListener('click',activate);document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!overlay.classList.contains('hidden'))activate()});
+async function registerDevice(){try{pairingStatus.innerText='Получаем код · Getting pairing code...';const r=await fetch('/api/tv/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device_uid:deviceUid})}),d=await r.json();if(!r.ok)throw Error(d.detail);deviceUid=d.device_uid;localStorage.setItem('horemi_device_uid',deviceUid);if(d.status==='paired')return completePairing(d.hotel);pairingCode.innerText=d.code;pairingStatus.innerText='Ожидаем подтверждение · Waiting for confirmation...';if(!pairTimer)pairTimer=setInterval(checkPairing,3000)}catch(e){pairingStatus.innerText='Нет связи · Retrying...';setTimeout(registerDevice,5000)}}
+async function checkPairing(){try{const r=await fetch('/api/tv/status?device_uid='+encodeURIComponent(deviceUid)),d=await r.json();if(d.status==='paired')completePairing(d.hotel);else if(d.code)pairingCode.innerText=d.code}catch(e){pairingStatus.innerText='Переподключаемся · Reconnecting...'}}
+function completePairing(hotel){if(pairTimer){clearInterval(pairTimer);pairTimer=null}pairingCode.innerText='✓';pairingStatus.innerText=hotel?'Подключено к «'+hotel.name+'» · Connected':'Телевизор подключен · TV connected';fetchData();setTimeout(()=>pairingScreen.classList.add('hidden'),1200)}
+updateClock();setInterval(updateClock,1000);fetchWeather();if(legacyHotelSlug){pairingScreen.classList.add('hidden');fetchData()}else registerDevice();
+</script>
 </body>
 </html>

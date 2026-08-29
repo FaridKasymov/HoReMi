@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import CommandStart
@@ -8,8 +9,8 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from sqlalchemy import select
-from db.database import AsyncSessionLocal
-from db.models import User, Station, HotelState, Hotel
+from db.database import AsyncSessionLocal, init_db
+from db.models import Device, Hotel, HotelState, PairingCode, Station, User
 
 load_dotenv()
 
@@ -50,9 +51,59 @@ async def cmd_start(message: types.Message):
         await message.answer(
             f"🏨 Добро пожаловать, {user.full_name}!\n"
             f"Отель: <b>{hotel.name}</b>\n\n"
+            f"📺 Чтобы подключить телевизор, отправьте сюда шестизначный код с его экрана.\n\n"
             f"🎵 Выберите радиостанцию для лобби:",
             reply_markup=builder.as_markup(),
             parse_mode="HTML"
+        )
+
+@dp.message(F.text.regexp(r"^\s*\d{6}\s*$"))
+async def pair_tv(message: types.Message):
+    code = message.text.strip()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    async with AsyncSessionLocal() as session:
+        user_result = await session.execute(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        user = user_result.scalar_one_or_none()
+        if not user:
+            await message.answer("⛔️ Доступ запрещен. Ваш Telegram не привязан к отелю.")
+            return
+
+        code_result = await session.execute(
+            select(PairingCode).where(
+                PairingCode.code == code,
+                PairingCode.used_at.is_(None),
+            )
+        )
+        pairing_code = code_result.scalar_one_or_none()
+        if not pairing_code or pairing_code.expires_at <= now:
+            await message.answer("❌ Код не найден или срок его действия истек. Обновите экран ТВ и попробуйте снова.")
+            return
+
+        device_result = await session.execute(
+            select(Device).where(Device.id == pairing_code.device_id)
+        )
+        device = device_result.scalar_one_or_none()
+        if not device:
+            await message.answer("❌ Телевизор не найден. Обновите экран ТВ и попробуйте снова.")
+            return
+
+        hotel_result = await session.execute(select(Hotel).where(Hotel.id == user.hotel_id))
+        hotel = hotel_result.scalar_one_or_none()
+        if not hotel:
+            await message.answer("❌ Для вашего аккаунта не найден отель.")
+            return
+
+        device.hotel_id = hotel.id
+        pairing_code.used_at = now
+        await session.commit()
+
+        await message.answer(
+            f"✅ Всё готово! Телевизор подключен к отелю <b>{hotel.name}</b>.\n"
+            f"Экран обновится автоматически.",
+            parse_mode="HTML",
         )
 
 # Этот хендлер ловит нажатия на инлайн-кнопки
@@ -94,6 +145,7 @@ async def change_station(callback: types.CallbackQuery):
 
 async def main():
     logging.basicConfig(level=logging.INFO)
+    await init_db()
     print("Бот запущен и готов к работе!")
     await dp.start_polling(bot)
 

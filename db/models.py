@@ -39,3 +39,23 @@ class HotelState(Base):
     current_station_id: Mapped[int] = mapped_column(ForeignKey('stations.id'))
     # Время последнего переключения (сохраняется автоматически)
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+class Device(Base):
+    __tablename__ = 'devices'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    device_uid: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    hotel_id: Mapped[int | None] = mapped_column(ForeignKey('hotels.id'), nullable=True)
+    name: Mapped[str] = mapped_column(String(100), default='TV')
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    last_seen: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+class PairingCode(Base):
+    __tablename__ = 'pairing_codes'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(6), unique=True, index=True)
+    device_id: Mapped[int] = mapped_column(ForeignKey('devices.id'))
+    expires_at: Mapped[datetime] = mapped_column(DateTime())
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
