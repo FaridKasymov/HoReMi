@@ -6,10 +6,10 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from db.database import AsyncSessionLocal
-from db.models import Device, Hotel, HotelState, PairingCode, Station
+from db.models import CustomBlock, Device, Hotel, HotelState, PairingCode, ScreenSession, Station
 
 router = APIRouter()
 
@@ -191,3 +191,114 @@ async def get_weather(lat: float = 55.75, lon: float = 37.61):
             return {"status": "error", "message": "Ошибка API погоды"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+class BlockCreate(BaseModel):
+    content: str
+    position: str
+
+@router.post("/api/screen/init")
+async def init_screen(db: AsyncSession = Depends(get_db)):
+    """Создает совместимую с админкой экранную сессию."""
+    for _ in range(20):
+        code = str(secrets.randbelow(900000) + 100000)
+        exists = await db.execute(select(ScreenSession.id).where(ScreenSession.pairing_code == code))
+        if exists.scalar_one_or_none() is None:
+            screen = ScreenSession(pairing_code=code, auth_token=uuid4().hex)
+            db.add(screen)
+            await db.commit()
+            return {"status": "ok", "pairing_code": code, "auth_token": screen.auth_token}
+    raise HTTPException(status_code=503, detail="Не удалось создать код экрана")
+
+@router.get("/api/screen/status")
+async def get_screen_status(token: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(ScreenSession).where(ScreenSession.auth_token == token))
+    screen = result.scalar_one_or_none()
+    if not screen:
+        raise HTTPException(status_code=404, detail="Сессия экрана не найдена")
+    if not screen.hotel_id:
+        return {"status": "waiting"}
+    hotel_result = await db.execute(select(Hotel).where(Hotel.id == screen.hotel_id))
+    hotel = hotel_result.scalar_one_or_none()
+    return {"status": "paired", "hotel_slug": hotel.slug if hotel else None}
+
+@router.get("/api/dashboard/hotels")
+async def get_dashboard_hotels(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Hotel).order_by(Hotel.id))
+    hotels = result.scalars().all()
+    data = []
+    for hotel in hotels:
+        device_count = await db.scalar(select(func.count(Device.id)).where(Device.hotel_id == hotel.id))
+        legacy_count = await db.scalar(select(func.count(ScreenSession.id)).where(ScreenSession.hotel_id == hotel.id))
+        data.append({
+            "id": hotel.id,
+            "name": hotel.name,
+            "slug": hotel.slug,
+            "is_active": hotel.is_active,
+            "active_screens": (device_count or 0) + (legacy_count or 0),
+        })
+    return {"status": "ok", "hotels": data}
+
+@router.get("/api/dashboard/hotel/{hotel_id}")
+async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db)):
+    hotel = (await db.execute(select(Hotel).where(Hotel.id == hotel_id))).scalar_one_or_none()
+    if not hotel:
+        raise HTTPException(status_code=404, detail="Отель не найден")
+    state = (await db.execute(select(HotelState).where(HotelState.hotel_id == hotel_id))).scalar_one_or_none()
+    stations = (await db.execute(select(Station).where(Station.is_active.is_(True)))).scalars().all()
+    blocks = (await db.execute(select(CustomBlock).where(CustomBlock.hotel_id == hotel_id))).scalars().all()
+    devices = (await db.execute(select(Device).where(Device.hotel_id == hotel_id))).scalars().all()
+    legacy_screens = (await db.execute(select(ScreenSession).where(ScreenSession.hotel_id == hotel_id))).scalars().all()
+    screens = [
+        {"id": device.id, "device_uid": device.device_uid, "pairing_code": None, "created_at": device.created_at.strftime("%d.%m.%Y %H:%M") if device.created_at else ""}
+        for device in devices
+    ] + [
+        {"id": screen.id, "device_uid": None, "pairing_code": screen.pairing_code, "created_at": screen.created_at.strftime("%d.%m.%Y %H:%M") if screen.created_at else ""}
+        for screen in legacy_screens
+    ]
+    return {
+        "status": "ok",
+        "hotel": {"name": hotel.name, "slug": hotel.slug, "address": hotel.address, "blocks": [{"id": b.id, "content": b.content, "position": b.position} for b in blocks]},
+        "current_station_id": state.current_station_id if state else None,
+        "stations": [{"id": station.id, "title": station.title} for station in stations],
+        "screens": screens,
+    }
+
+@router.post("/api/dashboard/hotel/{hotel_id}/block")
+async def add_custom_block(hotel_id: int, block: BlockCreate, db: AsyncSession = Depends(get_db)):
+    db.add(CustomBlock(hotel_id=hotel_id, content=block.content, position=block.position))
+    await db.commit()
+    return {"status": "ok"}
+
+@router.delete("/api/block/{block_id}")
+async def delete_block(block_id: int, db: AsyncSession = Depends(get_db)):
+    block = (await db.execute(select(CustomBlock).where(CustomBlock.id == block_id))).scalar_one_or_none()
+    if block:
+        await db.delete(block)
+        await db.commit()
+    return {"status": "ok"}
+
+@router.post("/api/dashboard/hotel/{hotel_id}/station/{station_id}")
+async def set_hotel_station(hotel_id: int, station_id: int, db: AsyncSession = Depends(get_db)):
+    station = (await db.execute(select(Station).where(Station.id == station_id, Station.is_active.is_(True)))).scalar_one_or_none()
+    if not station:
+        raise HTTPException(status_code=404, detail="Станция не найдена")
+    state = (await db.execute(select(HotelState).where(HotelState.hotel_id == hotel_id))).scalar_one_or_none()
+    if state:
+        state.current_station_id = station_id
+    else:
+        db.add(HotelState(hotel_id=hotel_id, current_station_id=station_id))
+    await db.commit()
+    return {"status": "ok"}
+
+@router.delete("/api/screen/{session_id}")
+async def unlink_screen(session_id: int, db: AsyncSession = Depends(get_db)):
+    device = (await db.execute(select(Device).where(Device.id == session_id))).scalar_one_or_none()
+    if device:
+        device.hotel_id = None
+        await db.commit()
+        return {"status": "ok"}
+    screen = (await db.execute(select(ScreenSession).where(ScreenSession.id == session_id))).scalar_one_or_none()
+    if screen:
+        await db.delete(screen)
+        await db.commit()
+    return {"status": "ok"}

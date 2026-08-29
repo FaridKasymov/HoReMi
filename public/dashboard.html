@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HoReMi Superadmin</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600&display=swap');
+
+        body {
+            margin: 0; padding: 0; font-family: 'Montserrat', sans-serif;
+            background-color: #0f0f11; color: white;
+        }
+
+        .header {
+            padding: 30px 50px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .header h1 { margin: 0; font-weight: 300; letter-spacing: 2px; }
+
+        .container { padding: 40px 50px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        /* Дизайн карточки */
+        .card {
+            background: #1a1a1d; border-radius: 16px; padding: 25px;
+            border: 1px solid rgba(255,255,255,0.05); cursor: pointer;
+            transition: all 0.3s ease; text-decoration: none; color: white;
+            display: block; position: relative; overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-5px); border-color: rgba(255,255,255,0.2);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        .card h2 { margin: 0 0 10px 0; font-weight: 600; font-size: 22px; }
+        .card p { margin: 0; color: #888; font-size: 14px; font-weight: 300; }
+
+        .stats {
+            margin-top: 25px; display: flex; gap: 20px;
+        }
+        .stat-box {
+            background: rgba(255,255,255,0.05); padding: 10px 15px;
+            border-radius: 8px; flex: 1; text-align: center;
+        }
+        .stat-box span { display: block; font-size: 24px; font-weight: 600; margin-bottom: 5px;}
+        .stat-box label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 1px;}
+
+        .status-dot {
+            height: 10px; width: 10px; border-radius: 50%;
+            display: inline-block; margin-right: 8px;
+        }
+        .status-active { background-color: #4CAF50; box-shadow: 0 0 10px #4CAF50;}
+        .status-inactive { background-color: #F44336; }
+        
+        .add-hotel {
+            background: transparent; border: 2px dashed rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: rgba(255,255,255,0.5);
+        }
+        .add-hotel:hover { background: rgba(255,255,255,0.02); color: white; border-color: rgba(255,255,255,0.4); }
+
+        .card-actions {
+            margin-top: 25px; display: flex; gap: 10px;
+        }
+        .btn-action {
+            flex: 1; text-align: center; text-decoration: none; padding: 10px;
+            border-radius: 8px; font-size: 13px; font-weight: 600; transition: 0.2s;
+        }
+        .btn-manage { background: white; color: black; }
+        .btn-manage:hover { background: #eee; }
+        .btn-preview { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .btn-preview:hover { background: rgba(255,255,255,0.2); }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>HoReMi // Управление</h1>
+    </div>
+
+    <div class="container">
+        <div class="grid" id="hotels-grid">
+            <!-- Сюда будут подгружаться карточки через JS -->
+        </div>
+    </div>
+
+    <script>
+        async function loadHotels() {
+            try {
+                const res = await fetch('/api/dashboard/hotels');
+                const data = await res.json();
+                
+                if(data.status === 'ok') {
+                    const grid = document.getElementById('hotels-grid');
+                    grid.innerHTML = ''; // Очищаем
+
+                    // Рендерим отели
+                    data.hotels.forEach(hotel => {
+                        const statusClass = hotel.is_active ? 'status-active' : 'status-inactive';
+                        const statusText = hotel.is_active ? 'Активен' : 'Отключен';
+
+                        const card = document.createElement('div'); // Теперь это div, а не ссылка
+                        card.className = 'card';
+                        card.innerHTML = `
+                            <h2>${hotel.name}</h2>
+                            <p><span class="status-dot ${statusClass}"></span>${statusText}</p>
+                            
+                            <div class="stats">
+                                <div class="stat-box">
+                                    <span>${hotel.active_screens}</span>
+                                    <label>Активных ТВ</label>
+                                </div>
+                            </div>
+                            
+                            <div class="card-actions">
+                                <a href="/public/hotel_manage.html?hotel_id=${hotel.id}" class="btn-action btn-manage">Настройки</a>
+                                <a href="/public/index.html?preview=${hotel.slug}" target="_blank" class="btn-action btn-preview">Экран ↗</a>
+                            </div>
+                        `;
+                        grid.appendChild(card);
+                    });
+                    
+                    // Добавляем кнопку "Добавить отель" (ведет в sqladmin)
+                    const addBtn = document.createElement('a');
+                    addBtn.href = '/admin/hotel/create';
+                    addBtn.className = 'card add-hotel';
+                    addBtn.innerHTML = '+ Добавить отель';
+                    grid.appendChild(addBtn);
+                }
+            } catch (err) {
+                console.error("Ошибка загрузки данных", err);
+            }
+        }
+
+        // Запускаем при загрузке страницы
+        loadHotels();
+        // Обновляем статистику экранов каждые 10 секунд
+        setInterval(loadHotels, 10000);
+    </script>
+</body>
+</html>
