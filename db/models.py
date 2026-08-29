@@ -78,3 +78,15 @@ class CustomBlock(Base):
     content: Mapped[str] = mapped_column(Text) # Текст с переносами
     position: Mapped[str] = mapped_column(String(50), default="bottom-center") # top-left, top-center, bottom-center, center
     is_active: Mapped[bool] = mapped_column(default=True)
+
+class Lead(Base):
+    __tablename__ = 'leads'
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    hotel_name: Mapped[str] = mapped_column(String(120))
+    contact_name: Mapped[str] = mapped_column(String(100))
+    contact: Mapped[str] = mapped_column(String(120))
+    city: Mapped[str] = mapped_column(String(80), default='Не указан')
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default='new')
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

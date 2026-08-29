@@ -27,6 +27,14 @@ app = FastAPI(title="Hotel Audio SaaS", lifespan=lifespan)
 # Подключаем наши маршруты (эндпоинты)
 app.include_router(api_router)
 
+@app.get("/", include_in_schema=False)
+async def landing_page():
+    return FileResponse("public/landing.html")
+
+@app.get("/demo", include_in_schema=False)
+async def demo_display():
+    return RedirectResponse("/public/index.html?hotel=plaza", status_code=307)
+
 @app.get("/admin", include_in_schema=False)
 async def admin_panel():
     return FileResponse("public/admin.html")

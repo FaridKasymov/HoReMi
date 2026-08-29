@@ -205,6 +205,19 @@
     .empty { min-height: 220px; padding: 40px; color: var(--muted); display: grid; place-items: center; text-align: center; }
     .empty strong { display: block; margin-bottom: 7px; color: var(--ink); font-family: Georgia, serif; font-size: 20px; font-weight: 400; }
 
+    .login-gate { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgba(30, 33, 29, .82); backdrop-filter: blur(12px); }
+    .login-gate.hidden { display: none; }
+    .login-card { width: min(390px, 100%); padding: 34px; border-radius: 26px; color: var(--ink); background: var(--surface); box-shadow: 0 30px 100px rgba(16, 18, 15, .32); }
+    .login-mark { margin-bottom: 28px; color: var(--dark); font-family: Georgia, serif; font-size: 30px; }
+    .login-card h2 { margin: 0 0 9px; font-family: Georgia, serif; font-size: 27px; font-weight: 400; }
+    .login-card p { margin: 0 0 24px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .login-field { display: grid; gap: 8px; margin-bottom: 15px; }
+    .login-field label { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .login-field input { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 14px; color: var(--ink); background: #fff; outline: none; letter-spacing: .18em; }
+    .login-field input:focus { border-color: #9e9c91; box-shadow: 0 0 0 3px rgba(89, 89, 75, .08); }
+    .login-card .btn { width: 100%; min-height: 46px; }
+    .login-error { min-height: 18px; margin: 12px 0 0!important; color: var(--danger)!important; font-size: 11px!important; }
+
     dialog { width: min(540px, calc(100vw - 30px)); max-height: calc(100vh - 30px); border: 0; border-radius: 24px; padding: 0; color: var(--ink); background: var(--surface); box-shadow: 0 30px 100px rgba(23, 25, 22, .3); }
     dialog::backdrop { background: rgba(26, 28, 25, .58); backdrop-filter: blur(4px); }
     .modal-head { min-height: 82px; padding: 0 25px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
@@ -276,8 +289,9 @@
         <button class="nav-btn" data-view="hotels"><span class="nav-icon">◇</span>Отели<span class="nav-count" id="nav-hotels">—</span></button>
         <button class="nav-btn" data-view="stations"><span class="nav-icon">◉</span>Радиостанции<span class="nav-count" id="nav-stations">—</span></button>
         <button class="nav-btn" data-view="devices"><span class="nav-icon">▣</span>Телевизоры<span class="nav-count" id="nav-devices">—</span></button>
+        <button class="nav-btn" data-view="leads"><span class="nav-icon">✦</span>Заявки<span class="nav-count" id="nav-leads">—</span></button>
       </nav>
-      <div class="sidebar-foot"><strong>Локальная панель</strong><br>Доступна устройствам в вашей домашней сети.</div>
+      <div class="sidebar-foot"><strong>Локальная панель</strong><br>Доступна устройствам в вашей домашней сети.<br><button class="text-btn" id="logout-btn" type="button" style="margin-top:12px;color:#c8ccc2">Выйти из админки →</button></div>
     </aside>
 
     <main class="main">
@@ -343,19 +357,27 @@
         <div class="toolbar"><div class="search"><input id="device-search" placeholder="Отель, название или ID"></div><div class="filter-note" id="devices-note"></div></div>
         <div class="panel table-wrap"><table class="data-table"><thead><tr><th>Телевизор</th><th>Отель</th><th>Последняя связь</th><th>Статус</th><th></th></tr></thead><tbody id="device-rows"></tbody></table></div>
       </section>
+
+      <section class="view" id="view-leads">
+        <div class="section-head"><div><h2>Заявки с сайта</h2><p class="section-note">Контакты гостиниц, которые запросили бесплатное демо.</p></div></div>
+        <div class="toolbar"><div class="search"><input id="lead-search" placeholder="Отель, имя или контакт"></div><div class="filter-note" id="leads-note"></div></div>
+        <div class="panel table-wrap"><table class="data-table"><thead><tr><th>Отель</th><th>Контакт</th><th>Город</th><th>Получена</th><th>Статус</th></tr></thead><tbody id="lead-rows"></tbody></table></div>
+      </section>
     </main>
   </div>
 
+  <div class="login-gate" id="login-gate"><form class="login-card" id="login-form"><div class="login-mark">HoReMi</div><h2>Вход в админку</h2><p>Введите PIN-код владельца проекта, чтобы открыть управление отелями, телевизорами и радиостанциями.</p><div class="login-field"><label for="admin-pin">PIN-код</label><input id="admin-pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required maxlength="32"></div><button class="btn primary" type="submit" id="login-submit">Войти</button><p class="login-error" id="login-error" aria-live="polite"></p></form></div>
   <dialog id="modal"><div class="modal-head"><h3 id="modal-title"></h3><button class="modal-close" type="button" id="modal-close">×</button></div><form class="modal-body" id="modal-form"><div id="modal-fields"></div><div class="modal-actions"><button class="btn ghost" type="button" id="modal-cancel">Отмена</button><button class="btn primary" type="submit" id="modal-submit">Сохранить</button></div></form></dialog>
   <div class="toast" id="toast"></div>
 
   <script>
-    const state = { overview: null, hotels: [], stations: [], devices: [], view: 'overview', modal: null };
+    const state = { overview: null, hotels: [], stations: [], devices: [], leads: [], view: 'overview', modal: null };
     const titles = {
       overview: ['Панель управления', 'Обзор'],
       hotels: ['Объекты', 'Отели'],
       stations: ['Аудиокаталог', 'Радиостанции'],
-      devices: ['Подключения', 'Телевизоры']
+      devices: ['Подключения', 'Телевизоры'],
+      leads: ['Продажи', 'Заявки']
     };
     const $ = selector => document.querySelector(selector);
     const $$ = selector => [...document.querySelectorAll(selector)];
@@ -377,10 +399,13 @@
       toast.textContent = message; toast.className = `toast show${error ? ' error' : ''}`;
       clearTimeout(notify.timer); notify.timer = setTimeout(() => toast.className = 'toast', 3000);
     }
+    function showLogin(message = '') { $('#login-gate').classList.remove('hidden'); $('#login-error').textContent = message; setTimeout(() => $('#admin-pin').focus(), 0); }
+    function hideLogin() { $('#login-gate').classList.add('hidden'); $('#login-error').textContent = ''; $('#admin-pin').value = ''; }
     async function api(url, options = {}) {
       const response = await fetch(url, { headers: {'Content-Type':'application/json', ...(options.headers || {})}, ...options });
       let data = {};
       try { data = await response.json(); } catch (_) {}
+      if (response.status === 401) { showLogin('Сессия завершилась. Введите PIN-код ещё раз.'); }
       if (!response.ok) throw new Error(data.detail || 'Не удалось выполнить запрос');
       return data;
     }
@@ -391,6 +416,7 @@
       $$('.nav-btn').forEach(el => el.classList.toggle('active', el.dataset.view === name));
       $('#page-kicker').textContent = titles[name][0]; $('#page-title').textContent = titles[name][1];
       const button = $('#context-action');
+      button.style.display = name === 'leads' ? 'none' : 'inline-flex';
       if (name === 'stations') { button.textContent = '＋ Добавить станцию'; button.dataset.action = 'add-station'; }
       else if (name === 'devices') { button.textContent = 'Как подключить ТВ'; button.dataset.action = 'pair-help'; }
       else { button.textContent = '＋ Добавить отель'; button.dataset.action = 'add-hotel'; }
@@ -448,18 +474,32 @@
       </tr>`).join('') : '<tr><td colspan="5"><div class="empty"><div><strong>Телевизоров пока нет</strong>После запуска заставки устройство появится здесь.</div></div></td></tr>';
     }
 
-    function renderCounts() {
-      $('#nav-hotels').textContent = state.hotels.length; $('#nav-stations').textContent = state.stations.length; $('#nav-devices').textContent = state.devices.length;
+    function renderLeads() {
+      const query = $('#lead-search').value.trim().toLowerCase();
+      const leads = state.leads.filter(lead => `${lead.hotel_name} ${lead.contact_name} ${lead.contact} ${lead.city}`.toLowerCase().includes(query));
+      const newCount = state.leads.filter(lead => lead.status === 'new').length;
+      $('#leads-note').textContent = `${newCount} новых · ${state.leads.length} всего`;
+      const statusLabels = {new:'Новая', contacted:'Связались', connected:'Подключён'};
+      $('#lead-rows').innerHTML = leads.length ? leads.map(lead => `<tr>
+        <td><div class="primary-cell"><span class="row-mark">✦</span><div><strong>${escapeHtml(lead.hotel_name)}</strong><small>${escapeHtml(lead.message || 'Без комментария')}</small></div></div></td>
+        <td><strong>${escapeHtml(lead.contact_name)}</strong><span class="url-cell">${escapeHtml(lead.contact)}</span></td>
+        <td>${escapeHtml(lead.city)}</td><td>${relativeTime(lead.created_at)}</td>
+        <td><select aria-label="Статус заявки" onchange="updateLeadStatus(${lead.id},this.value)" style="border:1px solid var(--line);border-radius:9px;padding:8px;background:#fff"><option value="new" ${lead.status==='new'?'selected':''}>Новая</option><option value="contacted" ${lead.status==='contacted'?'selected':''}>Связались</option><option value="connected" ${lead.status==='connected'?'selected':''}>Подключён</option></select></td>
+      </tr>`).join('') : '<tr><td colspan="5"><div class="empty"><div><strong>Заявок пока нет</strong>Новые запросы с сайта появятся здесь.</div></div></td></tr>';
     }
-    function renderAll() { renderOverview(); renderHotels(); renderStations(); renderDevices(); renderCounts(); }
+
+    function renderCounts() {
+      $('#nav-hotels').textContent = state.hotels.length; $('#nav-stations').textContent = state.stations.length; $('#nav-devices').textContent = state.devices.length; $('#nav-leads').textContent = state.leads.filter(lead => lead.status === 'new').length;
+    }
+    function renderAll() { renderOverview(); renderHotels(); renderStations(); renderDevices(); renderLeads(); renderCounts(); }
 
     async function loadAll(silent = false) {
       document.body.classList.add('loading');
       try {
-        const [overview, hotels, stations, devices] = await Promise.all([
-          api('/api/admin/overview'), api('/api/admin/hotels'), api('/api/admin/stations'), api('/api/admin/devices')
+        const [overview, hotels, stations, devices, leads] = await Promise.all([
+          api('/api/admin/overview'), api('/api/admin/hotels'), api('/api/admin/stations'), api('/api/admin/devices'), api('/api/admin/leads')
         ]);
-        state.overview = overview; state.hotels = hotels.hotels; state.stations = stations.stations; state.devices = devices.devices;
+        state.overview = overview; state.hotels = hotels.hotels; state.stations = stations.stations; state.devices = devices.devices; state.leads = leads.leads;
         renderAll(); $('#sync-text').textContent = `Обновлено ${new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}`;
         if (!silent) notify('Данные обновлены');
       } catch (error) { notify(error.message, true); }
@@ -529,19 +569,25 @@
       const station = state.stations.find(s => s.id === id); if (!station || !confirm(`Удалить станцию «${station.title}»?`)) return;
       try { await api(`/api/admin/stations/${id}`, {method:'DELETE'}); await loadAll(true); notify('Станция удалена'); } catch (error) { notify(error.message, true); }
     }
+    async function updateLeadStatus(id, status) {
+      try { await api(`/api/admin/leads/${id}`, {method:'PATCH', body:JSON.stringify({status})}); await loadAll(true); notify('Статус заявки обновлён'); } catch (error) { notify(error.message, true); }
+    }
 
     $$('.nav-btn').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
     $$('[data-go]').forEach(button => button.addEventListener('click', () => showView(button.dataset.go)));
     $$('[data-action]').forEach(button => button.addEventListener('click', () => button.dataset.action === 'add-station' ? openStation() : openHotel()));
     $('#context-action').addEventListener('click', event => { const action = event.currentTarget.dataset.action; action === 'add-station' ? openStation() : action === 'pair-help' ? showPairHelp() : openHotel(); });
     $('#refresh-btn').addEventListener('click', () => loadAll());
-    $('#hotel-search').addEventListener('input', renderHotels); $('#station-search').addEventListener('input', renderStations); $('#device-search').addEventListener('input', renderDevices);
+    $('#hotel-search').addEventListener('input', renderHotels); $('#station-search').addEventListener('input', renderStations); $('#device-search').addEventListener('input', renderDevices); $('#lead-search').addEventListener('input', renderLeads);
     $('#modal-close').addEventListener('click', closeModal); $('#modal-cancel').addEventListener('click', closeModal);
     modal.addEventListener('click', event => { if (event.target === modal) closeModal(); });
     $('#modal-form').addEventListener('submit', async event => { event.preventDefault(); if (!state.modal) return; const submit = $('#modal-submit'); submit.disabled = true; try { await state.modal(event.currentTarget); } catch (error) { notify(error.message, true); } finally { submit.disabled = false; } });
     $('#menu-btn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+    $('#logout-btn').addEventListener('click', async () => { try { await fetch('/api/admin/logout', {method:'POST'}); } finally { showLogin(); } });
+    $('#login-form').addEventListener('submit', async event => { event.preventDefault(); const form = event.currentTarget, submit = $('#login-submit'); submit.disabled = true; $('#login-error').textContent = ''; try { const response = await fetch('/api/admin/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({pin:form.pin.value})}); let data = {}; try { data = await response.json(); } catch (_) {} if (!response.ok) throw new Error(data.detail || 'Не удалось войти'); hideLogin(); await loadAll(true); } catch (error) { $('#login-error').textContent = error.message; } finally { submit.disabled = false; } });
 
-    const initialView = location.hash.slice(1); showView(titles[initialView] ? initialView : 'overview'); loadAll(true);
+    const initialView = location.hash.slice(1); showView(titles[initialView] ? initialView : 'overview');
+    (async () => { try { const response = await fetch('/api/admin/me'); if (!response.ok) { showLogin(); return; } hideLogin(); await loadAll(true); } catch (_) { showLogin('Не удалось проверить сессию'); } })();
     setInterval(() => loadAll(true), 30000);
   </script>
 </body>

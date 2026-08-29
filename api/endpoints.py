@@ -1,23 +1,94 @@
+import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from db.database import AsyncSessionLocal
-from db.models import CustomBlock, Device, Hotel, HotelState, PairingCode, ScreenSession, Station
+from db.models import CustomBlock, Device, Hotel, HotelState, Lead, PairingCode, ScreenSession, Station
 
 router = APIRouter()
+
+ADMIN_PIN = os.getenv("ADMIN_PIN", "").strip()
+ADMIN_SESSION_TOKEN = secrets.token_urlsafe(32)
+ADMIN_COOKIE = "horemi_admin_session"
+
+class AdminLoginRequest(BaseModel):
+    pin: str
+
+async def require_admin(request: Request) -> None:
+    if not ADMIN_PIN:
+        raise HTTPException(status_code=503, detail="ADMIN_PIN не настроен на сервере")
+    session = request.cookies.get(ADMIN_COOKIE, "")
+    if not session or not secrets.compare_digest(session, ADMIN_SESSION_TOKEN):
+        raise HTTPException(status_code=401, detail="Требуется вход в админку")
+
+@router.post("/api/admin/login")
+async def admin_login(payload: AdminLoginRequest, response: Response):
+    if not ADMIN_PIN:
+        raise HTTPException(status_code=503, detail="ADMIN_PIN не настроен на сервере")
+    if not secrets.compare_digest(payload.pin.strip(), ADMIN_PIN):
+        raise HTTPException(status_code=401, detail="Неверный PIN-код")
+    response.set_cookie(
+        ADMIN_COOKIE,
+        ADMIN_SESSION_TOKEN,
+        max_age=60 * 60 * 24 * 7,
+        httponly=True,
+        samesite="lax",
+    )
+    return {"status": "ok"}
+
+@router.post("/api/admin/logout")
+async def admin_logout(response: Response):
+    response.delete_cookie(ADMIN_COOKIE)
+    return {"status": "ok"}
+
+@router.get("/api/admin/me")
+async def admin_me(_: None = Depends(require_admin)):
+    return {"status": "ok"}
 
 # Функция-помощник для получения сессии базы данных
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
+
+class LeadCreate(BaseModel):
+    hotel_name: str
+    contact_name: str
+    contact: str
+    city: str = ""
+    message: str | None = None
+    website: str | None = None
+
+class LeadStatusUpdate(BaseModel):
+    status: str
+
+@router.post("/api/leads", status_code=201)
+async def create_lead(payload: LeadCreate, db: AsyncSession = Depends(get_db)):
+    # Невидимое поле отсеивает простых спам-ботов.
+    if payload.website:
+        return {"status": "ok"}
+    hotel_name = payload.hotel_name.strip()[:120]
+    contact_name = payload.contact_name.strip()[:100]
+    contact = payload.contact.strip()[:120]
+    if not hotel_name or not contact_name or not contact:
+        raise HTTPException(status_code=422, detail="Заполните название отеля, имя и контакт")
+    lead = Lead(
+        hotel_name=hotel_name,
+        contact_name=contact_name,
+        contact=contact,
+        city=(payload.city or "Не указан").strip()[:80] or "Не указан",
+        message=(payload.message or "").strip()[:1000] or None,
+    )
+    db.add(lead)
+    await db.commit()
+    return {"status": "ok", "message": "Заявка принята"}
 
 class RegisterDeviceRequest(BaseModel):
     device_uid: str | None = None
@@ -223,7 +294,7 @@ async def get_screen_status(token: str, db: AsyncSession = Depends(get_db)):
     return {"status": "paired", "hotel_slug": hotel.slug if hotel else None}
 
 @router.get("/api/dashboard/hotels")
-async def get_dashboard_hotels(db: AsyncSession = Depends(get_db)):
+async def get_dashboard_hotels(db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     result = await db.execute(select(Hotel).order_by(Hotel.id))
     hotels = result.scalars().all()
     data = []
@@ -240,7 +311,7 @@ async def get_dashboard_hotels(db: AsyncSession = Depends(get_db)):
     return {"status": "ok", "hotels": data}
 
 @router.get("/api/dashboard/hotel/{hotel_id}")
-async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db)):
+async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     hotel = (await db.execute(select(Hotel).where(Hotel.id == hotel_id))).scalar_one_or_none()
     if not hotel:
         raise HTTPException(status_code=404, detail="Отель не найден")
@@ -265,13 +336,13 @@ async def get_hotel_details(hotel_id: int, db: AsyncSession = Depends(get_db)):
     }
 
 @router.post("/api/dashboard/hotel/{hotel_id}/block")
-async def add_custom_block(hotel_id: int, block: BlockCreate, db: AsyncSession = Depends(get_db)):
+async def add_custom_block(hotel_id: int, block: BlockCreate, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     db.add(CustomBlock(hotel_id=hotel_id, content=block.content, position=block.position))
     await db.commit()
     return {"status": "ok"}
 
 @router.delete("/api/block/{block_id}")
-async def delete_block(block_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_block(block_id: int, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     block = (await db.execute(select(CustomBlock).where(CustomBlock.id == block_id))).scalar_one_or_none()
     if block:
         await db.delete(block)
@@ -279,7 +350,7 @@ async def delete_block(block_id: int, db: AsyncSession = Depends(get_db)):
     return {"status": "ok"}
 
 @router.post("/api/dashboard/hotel/{hotel_id}/station/{station_id}")
-async def set_hotel_station(hotel_id: int, station_id: int, db: AsyncSession = Depends(get_db)):
+async def set_hotel_station(hotel_id: int, station_id: int, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     station = (await db.execute(select(Station).where(Station.id == station_id, Station.is_active.is_(True)))).scalar_one_or_none()
     if not station:
         raise HTTPException(status_code=404, detail="Станция не найдена")
@@ -292,7 +363,7 @@ async def set_hotel_station(hotel_id: int, station_id: int, db: AsyncSession = D
     return {"status": "ok"}
 
 @router.delete("/api/screen/{session_id}")
-async def unlink_screen(session_id: int, db: AsyncSession = Depends(get_db)):
+async def unlink_screen(session_id: int, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     device = (await db.execute(select(Device).where(Device.id == session_id))).scalar_one_or_none()
     if device:
         device.hotel_id = None
@@ -387,7 +458,7 @@ async def serialize_hotel(hotel: Hotel, db: AsyncSession) -> dict:
 
 
 @router.get("/api/admin/overview")
-async def get_admin_overview(db: AsyncSession = Depends(get_db)):
+async def get_admin_overview(db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     hotels = (await db.execute(select(Hotel).order_by(Hotel.name))).scalars().all()
     devices = (await db.execute(select(Device).order_by(Device.last_seen.desc()))).scalars().all()
     stations = (await db.execute(select(Station).order_by(Station.title))).scalars().all()
@@ -418,13 +489,13 @@ async def get_admin_overview(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/api/admin/hotels")
-async def get_admin_hotels(db: AsyncSession = Depends(get_db)):
+async def get_admin_hotels(db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     hotels = (await db.execute(select(Hotel).order_by(Hotel.name))).scalars().all()
     return {"status": "ok", "hotels": [await serialize_hotel(hotel, db) for hotel in hotels]}
 
 
 @router.post("/api/admin/hotels")
-async def create_admin_hotel(payload: HotelCreate, db: AsyncSession = Depends(get_db)):
+async def create_admin_hotel(payload: HotelCreate, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     name = clean_required(payload.name, "Название")
     slug = clean_slug(payload.slug)
     hotel = Hotel(
@@ -446,7 +517,7 @@ async def create_admin_hotel(payload: HotelCreate, db: AsyncSession = Depends(ge
 
 @router.patch("/api/admin/hotels/{hotel_id}")
 async def update_admin_hotel(
-    hotel_id: int, payload: HotelUpdate, db: AsyncSession = Depends(get_db)
+    hotel_id: int, payload: HotelUpdate, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)
 ):
     hotel = (await db.execute(select(Hotel).where(Hotel.id == hotel_id))).scalar_one_or_none()
     if not hotel:
@@ -472,7 +543,7 @@ async def update_admin_hotel(
 
 
 @router.get("/api/admin/stations")
-async def get_admin_stations(db: AsyncSession = Depends(get_db)):
+async def get_admin_stations(db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     stations = (await db.execute(select(Station).order_by(Station.title))).scalars().all()
     usage_rows = await db.execute(
         select(HotelState.current_station_id, func.count(HotelState.hotel_id)).group_by(
@@ -497,7 +568,7 @@ async def get_admin_stations(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/api/admin/stations")
-async def create_admin_station(payload: StationCreate, db: AsyncSession = Depends(get_db)):
+async def create_admin_station(payload: StationCreate, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     station = Station(
         title=clean_required(payload.title, "Название"),
         stream_url=clean_required(payload.stream_url, "Ссылка на поток"),
@@ -512,7 +583,7 @@ async def create_admin_station(payload: StationCreate, db: AsyncSession = Depend
 
 @router.patch("/api/admin/stations/{station_id}")
 async def update_admin_station(
-    station_id: int, payload: StationUpdate, db: AsyncSession = Depends(get_db)
+    station_id: int, payload: StationUpdate, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)
 ):
     station = (
         await db.execute(select(Station).where(Station.id == station_id))
@@ -533,7 +604,7 @@ async def update_admin_station(
 
 
 @router.delete("/api/admin/stations/{station_id}")
-async def delete_admin_station(station_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_admin_station(station_id: int, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     station = (
         await db.execute(select(Station).where(Station.id == station_id))
     ).scalar_one_or_none()
@@ -553,7 +624,7 @@ async def delete_admin_station(station_id: int, db: AsyncSession = Depends(get_d
 
 
 @router.get("/api/admin/devices")
-async def get_admin_devices(db: AsyncSession = Depends(get_db)):
+async def get_admin_devices(db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
     devices = (await db.execute(select(Device).order_by(Device.last_seen.desc()))).scalars().all()
     hotels = (await db.execute(select(Hotel))).scalars().all()
     hotel_names = {hotel.id: hotel.name for hotel in hotels}
@@ -589,7 +660,7 @@ async def get_admin_devices(db: AsyncSession = Depends(get_db)):
 
 @router.patch("/api/admin/devices/{device_id}")
 async def update_admin_device(
-    device_id: int, payload: DeviceUpdate, db: AsyncSession = Depends(get_db)
+    device_id: int, payload: DeviceUpdate, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)
 ):
     device = (await db.execute(select(Device).where(Device.id == device_id))).scalar_one_or_none()
     if not device:
@@ -605,5 +676,40 @@ async def update_admin_device(
             if not hotel:
                 raise HTTPException(status_code=404, detail="Отель не найден")
         device.hotel_id = values["hotel_id"]
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.get("/api/admin/leads")
+async def get_admin_leads(db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)):
+    leads = (await db.execute(select(Lead).order_by(Lead.created_at.desc()))).scalars().all()
+    return {
+        "status": "ok",
+        "leads": [
+            {
+                "id": lead.id,
+                "hotel_name": lead.hotel_name,
+                "contact_name": lead.contact_name,
+                "contact": lead.contact,
+                "city": lead.city,
+                "message": lead.message or "",
+                "status": lead.status,
+                "created_at": lead.created_at.isoformat() if lead.created_at else None,
+            }
+            for lead in leads
+        ],
+    }
+
+
+@router.patch("/api/admin/leads/{lead_id}")
+async def update_admin_lead(
+    lead_id: int, payload: LeadStatusUpdate, db: AsyncSession = Depends(get_db), _: None = Depends(require_admin)
+):
+    lead = (await db.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Заявка не найдена")
+    if payload.status not in {"new", "contacted", "connected"}:
+        raise HTTPException(status_code=422, detail="Неизвестный статус заявки")
+    lead.status = payload.status
     await db.commit()
     return {"status": "ok"}
